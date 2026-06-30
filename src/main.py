@@ -35,12 +35,30 @@ def locate_data_json():
     return external
 
 
+def load_stylesheet():
+    """加载全局 QSS 样式表。优先加载 exe 同级 style.qss。"""
+    here = get_app_dir()
+    qss_path = os.path.join(here, "style.qss")
+    if not os.path.isfile(qss_path):
+        # 开发模式下从 src 同目录加载
+        qss_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.qss")
+    if os.path.isfile(qss_path):
+        with open(qss_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return ""
+
+
 def main():
     # 高 DPI
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(sys.argv)
     app.setApplicationName("BBR Skill Simulator")
+
+    # 加载全局样式表
+    qss = load_stylesheet()
+    if qss:
+        app.setStyleSheet(qss)
 
     # 全局异常 hook：未捕获异常弹窗而非崩溃
     def global_excepthook(exc_type, exc_value, exc_tb):

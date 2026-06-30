@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 """
 icon_provider.py
-图标加载与占位机制。
+Icon loading with placeholder fallback - upgraded badge-style placeholders.
 """
 
 import os
 import re
 
-from PySide6.QtGui import QPixmap, QPainter, QColor, QFont, QIcon, QImage
+from PySide6.QtGui import (
+    QPixmap, QPainter, QColor, QFont, QIcon, QImage,
+    QLinearGradient, QPen, QPainterPath,
+)
 from PySide6.QtCore import Qt, QSize
 
 
@@ -20,7 +23,6 @@ PLACEHOLDER_COLORS = {
 
 
 class IconProvider:
-    """图标加载器，带占位回退。"""
 
     def __init__(self, icons_dir=None, size=32):
         if icons_dir is None:
@@ -34,15 +36,12 @@ class IconProvider:
             icons_dir = os.path.join(here, "icons")
         self.icons_dir = icons_dir
         self.size = size
-
         self._cache = {}
         self._missing = set()
         self._icons_available = os.path.isdir(icons_dir)
         self._perk_icon_map = {}
         if self._icons_available:
             self._build_perk_map()
-
-    # ---------- 技能图标 ----------
 
     @staticmethod
     def _normalize_perk_name(name):
@@ -58,11 +57,9 @@ class IconProvider:
         return name.replace("_", "")
 
     def _build_perk_map(self):
-        """扫描 icons/ 目录下的 perk_*.png 和 perk_rf_*.png 文件。"""
         self._perk_icon_map = {}
         if not self._icons_available:
             return
-        # 同时检查 icons/ 根目录和 icons/perks/ 子目录
         scan_dirs = [
             self.icons_dir,
             os.path.join(self.icons_dir, "perks"),
@@ -75,7 +72,6 @@ class IconProvider:
                     continue
                 if fname.endswith("_sw.png"):
                     continue
-                # 只匹配 perk_ 或 perk_rf_ 开头的文件
                 if not (fname.startswith("perk_") or fname.startswith("perk_rf_")):
                     continue
                 full = os.path.join(scan_dir, fname)
@@ -97,7 +93,6 @@ class IconProvider:
         key = ("perk", perk_en_name, size)
         if key in self._cache:
             return self._cache[key]
-
         pix = None
         norm = self._normalize_perk_name(perk_en_name)
         compact = self._normalize_compact(norm)
@@ -118,7 +113,6 @@ class IconProvider:
                                 break
         if pix is None or pix.isNull():
             self._missing.add(("perk", perk_en_name))
-
         result = pix if (pix and not pix.isNull()) else QPixmap(size, size)
         self._cache[key] = result
         return result
@@ -127,35 +121,45 @@ class IconProvider:
     def skill_icons_available(self):
         return self._icons_available
 
-    # ---------- 通用图标 ----------
-
     @property
     def icons_available(self):
         return self._icons_available
 
     def _placeholder(self, subdir, name, size=None):
-        size = size or self.size
+        sz = size or self.size
         color = PLACEHOLDER_COLORS.get(subdir, PLACEHOLDER_COLORS["default"])
-        img = QImage(size, size, QImage.Format_ARGB32)
+        img = QImage(sz, sz, QImage.Format_ARGB32)
         img.fill(QColor(0, 0, 0, 0))
         p = QPainter(img)
         p.setRenderHint(QPainter.Antialiasing)
-        p.setBrush(color)
+        r = sz // 6
+        top_c = color.lighter(115)
+        bot_c = color.darker(110)
+        grad_path = QPainterPath()
+        grad_path.addRoundedRect(0, 0, sz, sz, r, r)
+        lg = QLinearGradient(0, 0, 0, sz)
+        lg.setColorAt(0, top_c)
+        lg.setColorAt(0.6, color)
+        lg.setColorAt(1, bot_c)
+        p.setBrush(lg)
         p.setPen(Qt.NoPen)
-        p.drawRoundedRect(0, 0, size, size, size // 6, size // 6)
+        p.drawPath(grad_path)
+        p.setPen(QPen(color.lighter(150), 1.0))
+        p.setBrush(Qt.NoBrush)
+        p.drawRoundedRect(1, 1, sz - 2, sz - 2, r - 1, r - 1)
         p.setPen(QColor(255, 255, 255))
-        font = QFont()
+        font = QFont("Microsoft YaHei")
         font.setBold(True)
-        font.setPixelSize(int(size * 0.45))
+        font.setPixelSize(int(sz * 0.42))
         p.setFont(font)
-        label = name[:1].upper() if name else "?"
+        label = name[:1] if name else "?"
         p.drawText(img.rect(), Qt.AlignCenter, label)
         p.end()
         return QPixmap.fromImage(img)
 
     def get_icon(self, name, subdir="groups", size=None):
-        size = size or self.size
-        key = (subdir, name, size)
+        sz = size or self.size
+        key = (subdir, name, sz)
         if key in self._cache:
             return self._cache[key]
         pix = None
@@ -175,14 +179,15 @@ class IconProvider:
             if pix is None or pix.isNull():
                 self._missing.add((subdir, name))
         if pix is None or pix.isNull():
-            pix = self._placeholder(subdir, name, size)
+            pix = self._placeholder(subdir, name, sz)
         icon = QIcon(pix)
         self._cache[key] = icon
         return icon
 
     def get_pixmap(self, name, subdir="groups", size=None):
         icon = self.get_icon(name, subdir, size)
-        return icon.pixmap(QSize(size or self.size, size or self.size))
+        sz = size or self.size
+        return icon.pixmap(QSize(sz, sz))
 
     def missing_report(self):
         return sorted(self._missing)
