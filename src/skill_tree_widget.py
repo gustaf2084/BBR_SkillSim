@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 skill_tree_widget.py
-技能树组矩阵可视化组件 — 含概率光环签名元素。
+Skill tree group matrix visualization — with probability halo signature element.
 """
 
 from PySide6.QtCore import (
@@ -18,23 +18,28 @@ from PySide6.QtWidgets import (
 )
 
 from perk_zh import get_perk_name_zh, get_perk_desc_zh
+from i18n import t
 
-# ── 紧凑布局常量 ──────────────────────────────────────────────
+# ── compact layout constants ─────────────────────────────────────
 NODE_RADIUS = 20
 NODE_DIAM = NODE_RADIUS * 2
 CELL_W = 84
-CELL_H = 44
+CELL_H = 56
 ROW_HEADER_W = 44
 COL_HEADER_H = 36
 MATRIX_LEFT = ROW_HEADER_W
 MATRIX_TOP = COL_HEADER_H
 DEFAULT_MAX_GROUPS = 5
-HALO_WIDTH = 2.5  # 概率光环线宽
-HALO_GAP = 3       # 光环与节点间距
+HALO_WIDTH = 2.5
+HALO_GAP = 3
 
-TIER_LABELS = ["1阶", "2阶", "3阶", "4阶", "5阶", "6阶", "7阶"]
 
-# 概率阶梯色
+def _tier_labels(lang="zh"):
+    """Return tier label list for given language."""
+    return [t("st.tier1"), t("st.tier2"), t("st.tier3"), t("st.tier4"),
+            t("st.tier5"), t("st.tier6"), t("st.tier7")]
+
+
 def prob_fill_color(p):
     if p >= 0.80:
         return QColor("#27704B")
@@ -48,7 +53,7 @@ def prob_fill_color(p):
 
 
 def prob_halo_color(p):
-    """光环色比填充色略亮。"""
+    """Halo color slightly lighter than fill."""
     c = prob_fill_color(p)
     return c.lighter(120)
 
@@ -58,10 +63,10 @@ def prob_border_color(p):
 
 
 class SkillNode(QGraphicsEllipseItem):
-    """技能节点：圆形 + perk 图标 + 概率光环。"""
+    """Skill node: circle + perk icon + probability halo."""
 
     def __init__(self, group_id, tier_label, skill_name, skill_desc,
-                 probability, icon_provider=None, highlighted=False):
+                 probability, icon_provider=None, highlighted=False, lang="zh"):
         r = NODE_RADIUS
         super().__init__(-r, -r, NODE_DIAM, NODE_DIAM)
         self.group_id = group_id
@@ -73,6 +78,7 @@ class SkillNode(QGraphicsEllipseItem):
         self._halo_color = prob_halo_color(probability)
         self._icon_provider = icon_provider
         self._highlighted = highlighted
+        self._lang = lang
         self.setAcceptHoverEvents(True)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setCursor(Qt.PointingHandCursor)
@@ -94,23 +100,22 @@ class SkillNode(QGraphicsEllipseItem):
             self.setOpacity(1.0)
 
     def paint(self, painter, option, widget=None):
-        # 1) 画概率光环（在节点外围）
+        # 1) draw probability halo (outside the node)
         if self._probability > 0:
             halo_r = NODE_RADIUS + HALO_GAP + HALO_WIDTH / 2
             halo_rect = QRectF(-halo_r, -halo_r, halo_r * 2, halo_r * 2)
-            arc_len = int(self._probability * 360 * 16)  # Qt 角度单位：1/16°
+            arc_len = int(self._probability * 360 * 16)
             if arc_len > 0:
                 pen = QPen(self._halo_color, HALO_WIDTH)
                 pen.setCapStyle(Qt.RoundCap)
                 painter.setPen(pen)
                 painter.setBrush(Qt.NoBrush)
-                # 从 12 点钟方向 (90°) 顺时针画弧
                 painter.drawArc(halo_rect, 90 * 16, -arc_len)
 
-        # 2) 画节点本体（填充圆 + 边框）
+        # 2) draw node body (filled circle + border)
         super().paint(painter, option, widget)
 
-        # 3) 画 perk 图标（在节点内部）
+        # 3) draw perk icon (inside the node)
         icon_size = NODE_DIAM - 6
         if self._icon_provider and self.skill_name:
             pix = self._icon_provider.get_perk_icon(self.skill_name, icon_size)
@@ -121,7 +126,7 @@ class SkillNode(QGraphicsEllipseItem):
                 painter.drawPixmap(int(sx), int(sy), scaled)
                 return
 
-        # 4) 无图标：显示技能名首字母缩写
+        # 4) no icon: show perk name abbreviation
         if self.skill_name:
             zh = get_perk_name_zh(self.skill_name)
             abbrev = zh[:2] if len(zh) >= 2 else (self.skill_name[:2].upper() if self.skill_name else "?")
@@ -135,6 +140,18 @@ class SkillNode(QGraphicsEllipseItem):
     def _tooltip_text(self):
         if not self.skill_name:
             return ""
+        if self._lang == "en":
+            name = self.skill_name
+            desc = (self.skill_desc or "").strip()
+            lines = [name]
+            if desc:
+                if len(desc) > 360:
+                    desc = desc[:357] + "..."
+                lines.append(chr(0x2500) * 24)
+                lines.append(desc)
+            lines.append("")
+            lines.append(f"[{self.group_id}]  {self.tier_label}")
+            return "\n".join(lines)
         zh_name = get_perk_name_zh(self.skill_name)
         zh_desc = get_perk_desc_zh(self.skill_name)
         if not zh_desc and self.skill_desc:
@@ -142,8 +159,8 @@ class SkillNode(QGraphicsEllipseItem):
         lines = [zh_name]
         if zh_desc:
             desc = zh_desc.strip()
-            if len(desc) > 240:
-                desc = desc[:237] + "..."
+            if len(desc) > 360:
+                desc = desc[:357] + "..."
             lines.append(chr(0x2500) * 24)
             lines.append(desc)
         lines.append("")
@@ -168,11 +185,12 @@ class SkillNode(QGraphicsEllipseItem):
 
 
 class SkillTreeView(QGraphicsView):
-    """带 sticky 行列头的 QGraphicsView。"""
+    """QGraphicsView with sticky row/column headers."""
 
     def __init__(self, scene, parent=None):
         super().__init__(scene, parent)
         self.setRenderHint(QPainter.Antialiasing)
+        self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
@@ -188,21 +206,25 @@ class SkillTreeView(QGraphicsView):
         self._flash_timer = QTimer(self)
         self._flash_timer.timeout.connect(self._on_flash_tick)
         self._flash_count = 0
+        self._tier_labels = _tier_labels("zh")
         self.horizontalScrollBar().valueChanged.connect(self._on_h_scroll)
 
     def set_col_headers(self, headers):
         self._col_headers = headers
 
+    def set_tier_labels(self, labels):
+        self._tier_labels = labels
+
     def highlight_column(self, col_index):
-        """短暂高亮闪烁指定列。"""
+        """Brief flash highlight of a specific column."""
         self._highlight_col = col_index
         self._flash_count = 0
-        self._flash_timer.start(150)  # 每 150ms 切换
+        self._flash_timer.start(150)
         self.viewport().update()
 
     def _on_flash_tick(self):
         self._flash_count += 1
-        if self._flash_count >= 6:  # 6×150ms = 900ms 闪烁
+        if self._flash_count >= 6:
             self._flash_timer.stop()
             self._highlight_col = -1
         self.viewport().update()
@@ -232,19 +254,20 @@ class SkillTreeView(QGraphicsView):
         vp = self.viewport().rect()
         painter.setRenderHint(QPainter.Antialiasing, False)
 
-        # 行头背景
+        # row header background
         painter.fillRect(QRectF(0, 0, ROW_HEADER_W, vp.height()), QColor("#F2F0E8"))
         painter.setPen(QPen(QColor("#D0CCC0"), 1))
         painter.drawLine(QPointF(ROW_HEADER_W, 0), QPointF(ROW_HEADER_W, vp.height()))
 
         painter.setFont(self._tier_font)
+        labels = self._tier_labels
         for row in range(7):
             y = MATRIX_TOP + row * CELL_H
             painter.setPen(QColor("#6B6359"))
             painter.drawText(QRectF(0, y, ROW_HEADER_W, CELL_H),
-                           Qt.AlignCenter, TIER_LABELS[row])
+                           Qt.AlignCenter, labels[row] if row < len(labels) else f"T{row+1}")
 
-        # 列头背景
+        # column header background
         painter.fillRect(QRectF(0, 0, vp.width(), COL_HEADER_H), QColor("#F2F0E8"))
         painter.setPen(QPen(QColor("#D0CCC0"), 1))
         painter.drawLine(QPointF(0, COL_HEADER_H - 1), QPointF(vp.width(), COL_HEADER_H - 1))
@@ -258,20 +281,20 @@ class SkillTreeView(QGraphicsView):
             if x + CELL_W < ROW_HEADER_W or x > vp.width():
                 continue
 
-            # 高亮列背景
+            # highlighted column background
             if col == self._highlight_col:
                 highlight_alpha = 40 if self._flash_count % 2 == 0 else 10
                 painter.fillRect(
                     QRectF(x, 0, CELL_W, vp.height()),
                     QColor(184, 134, 11, highlight_alpha))
 
-            # 概率色块
+            # probability color block
             pc = prob_fill_color(prob)
             painter.fillRect(QRectF(x + 4, COL_HEADER_H - 10, 5, 6), pc)
             painter.setPen(QPen(pc.darker(130), 1))
             painter.drawRect(QRectF(x + 4, COL_HEADER_H - 10, 5, 6))
 
-            # 列名
+            # column name
             text_color = QColor("#B8860B") if col == self._highlight_col else QColor("#333")
             painter.setPen(text_color)
             painter.drawText(QRectF(x + 12, 2, CELL_W - 16, COL_HEADER_H - 8),
@@ -281,34 +304,35 @@ class SkillTreeView(QGraphicsView):
 
 
 class SkillTreeWidget(QWidget):
-    """技能树矩阵组件：chip 标签栏 + QGraphicsView 矩阵。"""
+    """Skill tree matrix: chip bar + QGraphicsView matrix."""
 
     def __init__(self, parent=None, icon_provider=None):
         super().__init__(parent)
         self._icon_provider = icon_provider
+        self._lang = "zh"
         self._all_trees = []
         self._active_ids = set()
         self._scene = QGraphicsScene()
         self._scene.setBackgroundBrush(QColor("#FAFAF6"))
         self._view = SkillTreeView(self._scene)
 
-        # 占位提示
-        self._placeholder = QLabel("请选择一个背景并点击计算概率分布")
+        # placeholder hint
+        self._placeholder = QLabel(t("st.placeholder"))
         self._placeholder.setAlignment(Qt.AlignCenter)
         self._placeholder.setStyleSheet("color: #A09888; font-size: 14px; padding: 30px;")
 
-        # ── Chip 标签栏 ──
+        # ── Chip bar ──
         self._chip_bar = QWidget()
         self._chip_bar.setVisible(False)
         chip_layout = QHBoxLayout(self._chip_bar)
         chip_layout.setContentsMargins(2, 4, 2, 4)
         chip_layout.setSpacing(4)
 
-        chip_label = QLabel("技能组：")
-        chip_label.setStyleSheet("font-size: 12px; color: #6B6359;")
-        chip_layout.addWidget(chip_label)
+        self._chip_label = QLabel(t("st.chip_label"))
+        self._chip_label.setStyleSheet("font-size: 12px; color: #6B6359;")
+        chip_layout.addWidget(self._chip_label)
 
-        # chip 容器（可滚动）
+        # chip container (scrollable)
         self._chip_scroll = QScrollArea()
         self._chip_scroll.setWidgetResizable(True)
         self._chip_scroll.setFixedHeight(36)
@@ -322,8 +346,8 @@ class SkillTreeWidget(QWidget):
         self._chip_scroll.setWidget(self._chip_container)
         chip_layout.addWidget(self._chip_scroll, 1)
 
-        # "+ 添加强制" 按钮
-        self._add_btn = QPushButton("+ 添加组")
+        # "+ Add Group" button
+        self._add_btn = QPushButton(t("st.add_btn"))
         self._add_btn.setObjectName("nav_button")
         self._add_btn.setFixedHeight(28)
         self._add_btn.setStyleSheet(
@@ -335,7 +359,7 @@ class SkillTreeWidget(QWidget):
 
         chip_layout.addStretch()
 
-        # ── 总布局 ──
+        # ── Overall layout ──
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -343,7 +367,20 @@ class SkillTreeWidget(QWidget):
         layout.addWidget(self._chip_bar)
         layout.addWidget(self._view, 1)
 
-    # ── 公共 API ──────────────────────────────────────────────
+    # ── Public API ──────────────────────────────────────────────
+
+    def set_lang(self, lang):
+        """Set tooltip display language ('zh' or 'en') and refresh matrix."""
+        if lang not in ("zh", "en"):
+            lang = "zh"
+        self._lang = lang
+        # update UI strings
+        self._placeholder.setText(t("st.placeholder"))
+        self._chip_label.setText(t("st.chip_label"))
+        self._add_btn.setText(t("st.add_btn"))
+        # update tier labels in view
+        self._view.set_tier_labels(_tier_labels(lang))
+        self._rebuild()
 
     def set_trees(self, trees):
         self._all_trees = [t for t in trees if t.get("probability", 0) > 0]
@@ -373,7 +410,7 @@ class SkillTreeWidget(QWidget):
                 self._view.highlight_column(col)
                 return
 
-    # ── 内部 ──────────────────────────────────────────────────
+    # ── Internal ──────────────────────────────────────────────────
 
     def _refresh(self):
         self._rebuild()
@@ -389,6 +426,7 @@ class SkillTreeWidget(QWidget):
         self._placeholder.setVisible(False)
         self._chip_bar.setVisible(True)
 
+        tier_labels = _tier_labels(self._lang)
         for col, tree in enumerate(active):
             gid = tree["group_id"]
             prob = tree.get("probability", 0)
@@ -401,8 +439,9 @@ class SkillTreeWidget(QWidget):
                 parts = perk_raw.split("\n", 1)
                 sname = parts[0].strip()
                 sdesc = parts[1].strip() if len(parts) > 1 else ""
-                node = SkillNode(gid, TIER_LABELS[row], sname, sdesc,
-                                 prob, self._icon_provider)
+                tlabel = tier_labels[row] if row < len(tier_labels) else f"Tier {row+1}"
+                node = SkillNode(gid, tlabel, sname, sdesc,
+                                 prob, self._icon_provider, lang=self._lang)
                 x = MATRIX_LEFT + col * CELL_W + CELL_W // 2
                 y = MATRIX_TOP + row * CELL_H + CELL_H // 2
                 node.setPos(x, y)
@@ -417,8 +456,8 @@ class SkillTreeWidget(QWidget):
         self._scene.setSceneRect(0, 0, scene_w, scene_h)
 
     def _rebuild_chips(self):
-        """重建 chip 标签栏。"""
-        # 清除旧 chip
+        """Rebuild chip tag bar."""
+        # clear old chips
         for i in reversed(range(self._chip_layout.count())):
             w = self._chip_layout.itemAt(i).widget()
             if w:
@@ -466,7 +505,7 @@ class SkillTreeWidget(QWidget):
         self._refresh()
 
     def _on_add_menu(self):
-        """弹出添加组的菜单。"""
+        """Show menu to add a group."""
         menu = QMenu(self)
         for t in self._all_trees:
             if t["group_id"] in self._active_ids:
@@ -476,14 +515,14 @@ class SkillTreeWidget(QWidget):
             action = menu.addAction(f"{gname}  ({pct}%)")
             action.setData(t["group_id"])
         if menu.isEmpty():
-            menu.addAction("（所有组已显示）").setEnabled(False)
+            menu.addAction(t("st.all_shown")).setEnabled(False)
         chosen = menu.exec(self._add_btn.mapToGlobal(self._add_btn.rect().bottomLeft()))
         if chosen and chosen.data():
             self._active_ids.add(chosen.data())
             self._refresh()
 
     def _animate_scroll(self, target_x):
-        """平滑滚动到目标 x 位置。"""
+        """Smooth scroll to target x position."""
         sb = self._view.horizontalScrollBar()
         anim = QPropertyAnimation(sb, b"value")
         anim.setDuration(300)
@@ -491,5 +530,4 @@ class SkillTreeWidget(QWidget):
         anim.setEndValue(target_x)
         anim.setEasingCurve(QEasingCurve.OutCubic)
         anim.start()
-        # 保持引用防止被 GC
-        self._scroll_anim = anim
+        # keep reference to animation to prevent garbage collection

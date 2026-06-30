@@ -20,11 +20,17 @@ REQUIRED_BG_FIELDS = ["display_zh","group_rolls","multipliers",
                        "melee_only","exclusive","base_probabilities","icon"]
 REQUIRED_TRAIT_FIELDS = ["display_zh","weights","icon"]
 
+# 去重组：每组只保留第一个作为代表，其余隐藏（界面不显示）。
 DUPLICATE_BG_GROUPS = [
     ["caravan_hand_background", "caravan_hand_southern_background"],
-    ["companion_1h_background", "companion_1h_southern_background",
-     "companion_2h_background", "companion_2h_southern_background",
-     "companion_ranged_background", "companion_ranged_southern_background"],
+]
+
+# 完全隐藏的背景：整个系列都不在界面显示（用户要求移除伙友/companion 系）。
+# data.json 中数据保留，仅 UI 隐藏，引擎与数据逻辑不变。
+HIDDEN_BACKGROUNDS = [
+    "companion_1h_background", "companion_1h_southern_background",
+    "companion_2h_background", "companion_2h_southern_background",
+    "companion_ranged_background", "companion_ranged_southern_background",
 ]
 
 def _build_excluded():
@@ -32,6 +38,7 @@ def _build_excluded():
     for group in DUPLICATE_BG_GROUPS:
         for bg_id in group[1:]:
             excluded.add(bg_id)
+    excluded.update(HIDDEN_BACKGROUNDS)
     return excluded
 
 EXCLUDED_BACKGROUNDS = _build_excluded()
@@ -127,9 +134,44 @@ class GameData:
     def is_background_excluded(self, bg_id):
         return bg_id in EXCLUDED_BACKGROUNDS
 
+    @staticmethod
+    def _en_display_name(bg_id):
+        """英文界面背景显示名规范化：
+        去 _background 后缀、去 rf_ 内部前缀、_southern 提为 Southern 前缀、
+        _1h/_2h/_ranged 转可读后缀、介词/冠词保持小写、Kings Guard→King's Guard。
+        仅用于英文界面显示，不影响内部 id 与引擎逻辑。
+        """
+        s = bg_id
+        if s.endswith("_background"):
+            s = s[: -len("_background")]
+        if s.startswith("rf_"):
+            s = s[len("rf_"):]
+        southern = False
+        if s.endswith("_southern"):
+            southern = True
+            s = s[: -len("_southern")]
+        SMALL = {"on", "the", "of", "for", "in", "and", "to", "a", "an"}
+
+        def _cap(p):
+            if p in SMALL:
+                return p
+            if p == "1h":
+                return "1H"
+            if p == "2h":
+                return "2H"
+            return p.capitalize()
+
+        parts = [p for p in s.split("_") if p]
+        name = " ".join(_cap(p) for p in parts)
+        if name == "Kings Guard":
+            name = "King's Guard"
+        if southern:
+            name = "Southern " + name
+        return name
+
     def bg_name(self, bg_id):
         if self.lang == "en":
-            return bg_id
+            return self._en_display_name(bg_id)
         return self.backgrounds.get(bg_id, {}).get("display_zh") or bg_id
 
     def trait_name(self, trait_id):

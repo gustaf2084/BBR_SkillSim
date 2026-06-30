@@ -18,9 +18,5 @@ Thumbs.db
 
 # Release binaries (too large for GitHub; use Releases for download)
 release/
-
-# One-time data-gen scripts (not part of the app runtime)
-src/build_data_json.py
-src/download_vanilla_icons.py
-src/fill_display_zh.py
-src/test_engine.py
+# Runtime
+settings.json

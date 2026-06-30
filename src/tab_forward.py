@@ -12,24 +12,15 @@ from PySide6.QtWidgets import (
     QCompleter,
 )
 from skill_tree_widget import SkillTreeWidget
+from i18n import t, prob_tier_label, cat_name
 
-CAT_ZH = {
-    "Shared":"共有组","Exclusive":"专属组","Weapon":"武器组",
-    "Armor":"护甲组","Fighting Style":"战斗风格","Special":"特殊组","Always":"常驻",
-}
+# Category display colors (visual only, not language-specific)
 CAT_COLOR = {
     "Shared":("#27704B","#FFFFFF"),"Exclusive":("#8B6914","#FFFFFF"),
     "Weapon":("#5A6B7D","#FFFFFF"),"Armor":("#7B6B5A","#FFFFFF"),
     "Fighting Style":("#8B1A6B","#FFFFFF"),"Special":("#B8860B","#FFFFFF"),
     "Always":("#4A4A4A","#FFFFFF"),
 }
-
-def prob_label(p):
-    if p>=0.80: return "大概率","#27704B"
-    if p>=0.50: return "较可能","#A0522D"
-    if p>=0.20: return "看运气","#5A6B7D"
-    if p>0: return "小概率","#8B8378"
-    return "不出现","#B0B0B0"
 
 
 class ForwardTab(QWidget):
@@ -54,14 +45,14 @@ class ForwardTab(QWidget):
         lv.setSpacing(8)
 
         # bg group
-        bg_grp = QGroupBox("角色配置")
-        bf = QFormLayout(bg_grp)
+        self._bg_grp = QGroupBox(t("forward.char_config"))
+        bf = QFormLayout(self._bg_grp)
         bf.setSpacing(8)
 
         self.bg_combo = QComboBox()
         self.bg_combo.setEditable(True)
         self.bg_combo.setInsertPolicy(QComboBox.NoInsert)
-        self.bg_combo.lineEdit().setPlaceholderText("输入搜索背景...")
+        self.bg_combo.lineEdit().setPlaceholderText(t("forward.bg_search_ph"))
         self.bg_combo.lineEdit().setClearButtonEnabled(True)
         self._bg_model = QStringListModel()
         self._bg_completer = QCompleter()
@@ -69,14 +60,15 @@ class ForwardTab(QWidget):
         self._bg_completer.setCaseSensitivity(Qt.CaseInsensitive)
         self._bg_completer.setFilterMode(Qt.MatchContains)
         self.bg_combo.setCompleter(self._bg_completer)
-        bf.addRow("背景:", self.bg_combo)
+        self._bg_label = QLabel(t("forward.bg_label"))
+        bf.addRow(self._bg_label, self.bg_combo)
 
-        # traits section - use VBox inside group box (not form layout)
-        trait_label = QLabel("特性 (最多3个):")
-        trait_label.setStyleSheet("font-weight:bold;")
-        bf.addRow(trait_label)
+        # traits section
+        self._trait_label = QLabel(t("forward.traits_label"))
+        self._trait_label.setStyleSheet("font-weight:bold;")
+        bf.addRow(self._trait_label)
 
-        lv.addWidget(bg_grp)
+        lv.addWidget(self._bg_grp)
 
         # trait grid in its own scroll area
         self.trait_scroll = QScrollArea()
@@ -91,24 +83,25 @@ class ForwardTab(QWidget):
         lv.addWidget(self.trait_scroll, 1)
 
         # advanced
-        adv = QGroupBox("高级选项")
-        adv.setCheckable(True)
-        adv.setChecked(False)
-        af = QFormLayout(adv)
-        self.attr_check = QCheckBox("计入天赋星修正")
+        self._adv_grp = QGroupBox(t("forward.advanced"))
+        self._adv_grp.setCheckable(True)
+        self._adv_grp.setChecked(False)
+        af = QFormLayout(self._adv_grp)
+        self.attr_check = QCheckBox(t("forward.use_attr"))
         self.attr_check.setChecked(True)
-        self.proj_check = QCheckBox("计入投影属性修正")
+        self.proj_check = QCheckBox(t("forward.use_proj"))
         self.proj_check.setChecked(True)
         af.addRow(self.attr_check)
         af.addRow(self.proj_check)
         self.mode_combo = QComboBox()
-        self.mode_combo.addItem("快速（解析近似）", "analytic")
-        self.mode_combo.addItem("精确（蒙特卡洛）", "monte_carlo")
-        af.addRow("计算模式:", self.mode_combo)
-        lv.addWidget(adv)
+        self.mode_combo.addItem(t("mode.analytic"), "analytic")
+        self.mode_combo.addItem(t("mode.monte"), "monte_carlo")
+        self._mode_label = QLabel(t("common.mode_label"))
+        af.addRow(self._mode_label, self.mode_combo)
+        lv.addWidget(self._adv_grp)
 
         # calc button
-        self.calc_btn = QPushButton("▶  计算概率分布")
+        self.calc_btn = QPushButton(t("forward.calc_btn"))
         self.calc_btn.setObjectName("primary_btn")
         self.calc_btn.clicked.connect(self._on_calculate)
         lv.addWidget(self.calc_btn)
@@ -120,16 +113,16 @@ class ForwardTab(QWidget):
         rv = QVBoxLayout(right)
         rv.setContentsMargins(0,0,0,0)
 
-        self.result_title = QLabel("请在左侧选择背景与特性，点击「计算概率分布」")
+        self.result_title = QLabel(t("forward.result_title_ph"))
         self.result_title.setObjectName("page_title")
         rv.addWidget(self.result_title)
 
         self.none_label = QWidget()
         self.none_label.setObjectName("notice_parchment")
         nlv = QVBoxLayout(self.none_label)
-        nt = QLabel("⚠ 无可用方案")
-        nt.setObjectName("notice_parchment_title")
-        nlv.addWidget(nt)
+        self._none_title_lbl = QLabel(t("forward.none_title"))
+        self._none_title_lbl.setObjectName("notice_parchment_title")
+        nlv.addWidget(self._none_title_lbl)
         self.none_reason = QLabel("")
         self.none_reason.setWordWrap(True)
         self.none_reason.setStyleSheet("font-size:14px;color:#1C1814;padding-top:4px;")
@@ -144,12 +137,17 @@ class ForwardTab(QWidget):
         top = QWidget()
         tv = QVBoxLayout(top)
         tv.setContentsMargins(0,0,0,0)
-        tt = QLabel("概率分布表（点击行查看下方技能树）")
-        tt.setStyleSheet("font-size:12px;color:#6B6359;padding:2px 6px;")
-        tv.addWidget(tt)
+        self._table_caption = QLabel(t("forward.table_caption"))
+        self._table_caption.setStyleSheet("font-size:12px;color:#6B6359;padding:2px 6px;")
+        tv.addWidget(self._table_caption)
 
         self.result_table = QTableWidget(0,5)
-        self.result_table.setHorizontalHeaderLabels(["图标","技能树组","类别","出现概率","概率条"])
+        self._forward_headers = [
+            t("forward.h_icon"), t("forward.h_group"),
+            t("forward.h_category"), t("forward.h_probability"),
+            t("forward.h_bar"),
+        ]
+        self.result_table.setHorizontalHeaderLabels(self._forward_headers)
         self.result_table.horizontalHeader().setSectionResizeMode(0,QHeaderView.Fixed)
         self.result_table.horizontalHeader().resizeSection(0,50)
         self.result_table.horizontalHeader().setSectionResizeMode(1,QHeaderView.Stretch)
@@ -198,6 +196,58 @@ class ForwardTab(QWidget):
         # traits
         self._build_trait_grid()
 
+        # sync skill tree language, refresh tooltip if results exist
+        self.skill_tree.set_lang(getattr(gd, "lang", "zh"))
+        if self._last_results:
+            self._fill_skill_tree(self._last_results)
+
+        self.retranslate()
+
+    def retranslate(self):
+        """Refresh all static text to current language."""
+        self._bg_grp.setTitle(t("forward.char_config"))
+        self._bg_label.setText(t("forward.bg_label"))
+        self.bg_combo.lineEdit().setPlaceholderText(t("forward.bg_search_ph"))
+        self._trait_label.setText(t("forward.traits_label"))
+        self._adv_grp.setTitle(t("forward.advanced"))
+        self.attr_check.setText(t("forward.use_attr"))
+        self.proj_check.setText(t("forward.use_proj"))
+        self._mode_label.setText(t("common.mode_label"))
+        # mode combo items
+        self.mode_combo.setItemText(0, t("mode.analytic"))
+        self.mode_combo.setItemText(1, t("mode.monte"))
+        self.calc_btn.setText(t("forward.calc_btn"))
+        self._none_title_lbl.setText(t("forward.none_title"))
+        self._table_caption.setText(t("forward.table_caption"))
+        # result title: keep placeholder or recompute
+        if self._last_results is None:
+            self.result_title.setText(t("forward.result_title_ph"))
+        else:
+            # recompute result title with current language
+            self._refresh_result_title()
+        # table headers
+        self._forward_headers = [
+            t("forward.h_icon"), t("forward.h_group"),
+            t("forward.h_category"), t("forward.h_probability"),
+            t("forward.h_bar"),
+        ]
+        self.result_table.setHorizontalHeaderLabels(self._forward_headers)
+        # re-fill table if results exist (category/prob labels need refresh)
+        if self._last_results is not None:
+            self._fill_table(self._last_results)
+
+    def _refresh_result_title(self):
+        """Rebuild result title from _last_results using current language."""
+        if self.gd is None or self._last_results is None:
+            return
+        trait_ids = [cb.property("trait_id") for cb in self._trait_checkboxes if cb.isChecked()]
+        traits_str = ", ".join(self.gd.trait_name(t) for t in trait_ids) if trait_ids else ""
+        bg_id = self.bg_combo.currentData()
+        if bg_id:
+            self.result_title.setText(
+                t("forward.result_ok_prefix") + self.gd.bg_name(bg_id) +
+                (" + " + traits_str if traits_str else ""))
+
     def _build_trait_grid(self):
         # clear old
         for cb in self._trait_checkboxes:
@@ -225,7 +275,8 @@ class ForwardTab(QWidget):
                 sender.blockSignals(True)
                 sender.setChecked(False)
                 sender.blockSignals(False)
-                QMessageBox.warning(self, "提示", "特性最多选择 3 个。")
+                QMessageBox.warning(self, t("forward.trait_limit_title"),
+                                    t("forward.trait_limit_body"))
 
     # ---- calculate ----
 
@@ -250,7 +301,8 @@ class ForwardTab(QWidget):
                     bg_id, trait_ids, mode="analytic",
                     use_attribute=use_attr, use_projected=use_proj)
         except Exception as e:
-            QMessageBox.critical(self, "计算错误", f"计算过程出错：\n{e}")
+            QMessageBox.critical(self, t("forward.calc_err_title"),
+                                 t("forward.calc_err_prefix") + str(e))
             return
 
         self._last_results = res
@@ -259,7 +311,7 @@ class ForwardTab(QWidget):
 
         if res is None:
             self.result_table.setRowCount(0)
-            self.result_title.setText("正向模拟结果：无可用方案")
+            self.result_title.setText(t("forward.result_none"))
             reason = self.engine.forward_reason_if_none(bg_id, trait_ids)
             self.none_reason.setText(reason)
             self.none_label.setVisible(True)
@@ -269,7 +321,7 @@ class ForwardTab(QWidget):
 
         traits_str = ", ".join(self.gd.trait_name(t) for t in trait_ids) if trait_ids else ""
         self.result_title.setText(
-            "正向模拟结果：" + self.gd.bg_name(bg_id) +
+            t("forward.result_ok_prefix") + self.gd.bg_name(bg_id) +
             (" + " + traits_str if traits_str else ""))
         self._fill_table(res)
         self._fill_skill_tree(res)
@@ -292,7 +344,7 @@ class ForwardTab(QWidget):
             self.result_table.setItem(row, 1, ni)
             # category tag
             cat = self.gd.group_category(group) or ""
-            cz = CAT_ZH.get(cat, cat)
+            cz = cat_name(cat) if cat else cat
             bgc, txc = CAT_COLOR.get(cat, ("#4A4A4A","#FFFFFF"))
             ci = QTableWidgetItem(" " + cz + " ")
             ci.setTextAlignment(Qt.AlignCenter)
@@ -301,7 +353,7 @@ class ForwardTab(QWidget):
             ci.setFont(QFont("Microsoft YaHei",10,QFont.Bold))
             self.result_table.setItem(row, 2, ci)
             # prob
-            lbl, color = prob_label(p)
+            lbl, color = prob_tier_label(p)
             pi = QTableWidgetItem(str(int(p*100))+"% ("+lbl+")")
             pi.setFont(df)
             pi.setForeground(QBrush(QColor(color)))
@@ -343,4 +395,4 @@ class ForwardTab(QWidget):
             return
         gid = ni.data(Qt.UserRole)
         if gid:
-            self.skill_tree.scroll
+            self.skill_tree.scroll_to_group(gid)

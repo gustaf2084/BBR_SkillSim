@@ -7791,9 +7791,6 @@
     }
   },
   "perk_trees": {
-    "General": {
-      "Tier 1": "Bags and Belts\nUnlock two extra bag slots.\nItems placed in bags no longer apply a penalty to Maximum Fatigue, except for two-handed weapons"
-    },
     "Agile": {
       "Tier 1": "Pathfinder\nAction Point costs for movement on all terrain is reduced by -1 to a minimum of 2 Action Points per tile, and Fatigue cost is reduced to half. Changing height levels also has no additional Action Point cost anymore.",
       "Tier 2": "Anticipation\nTake reduced damage from the first 2 attacks you receive each battle.\nThis reduction is a percentage equal to your current Ranged Defense plus an additional 10% for each tile between the attacker and you.",
@@ -7809,20 +7806,6 @@
       "Tier 5": "Calculated Strikes\nDeal 20% more damage against anyone who has not started their turn yet in the current round.\nInitiative is reduced by 20%.",
       "Tier 6": "Overwhelm\nWith every attack, hit or miss, against an opponent that acts after you in the current round, inflict the Overwhelmed status effect which lowers both Melee Skill and Ranged Skill by -10% for one turn.\nThe effect stacks with each attack, up to a maximum of 7 stacks, and can be applied to multiple targets at once with a single attack.",
       "Tier 7": "Combo\nUsing any skill that costs Action Points reduces the Action Point cost of all other skills of this character by 1 to a minimum of 3.\nThis effect expires upon using any non-free skill, waiting or ending your turn."
-    },
-    "Leadership": {
-      "Tier 1": "Supporter\nOnce per turn, after you use a skill targeting an adjacent ally, recover 3 Action Points.\nGain Encourage.\n\nEncourage\n Trigger a positive morale check for an ally within 2 tiles with a bonus of 50% of your Resolve.\nCan only be used on characters who are of your faction and whose morale is lower than yours per tile of distance they are away.\nCannot be used on fleeing or stunned targets.\nOnly usable once per turn.\nCost: 4 AP 15 Fat",
-      "Tier 2": "Rally the Troops\nTriggers a morale check to raise the morale of anyone of your faction who is wavering or worse within 4 tiles distance, with a bonus to Resolve of 40% of your Resolve. The bonus is lowered by -10 per tile distance except for Fleeing targets.\nRemoves the Sleeping status effect on allies within range.\nCost: 5 AP, 25 Fat",
-      "Tier 3": "Fortified Mind",
-      "Tier 4": "Polearm Mastery",
-      "Tier 5": "Command\nUnlocks the Command skill which can be used on an ally within 3 tiles to move them to the next position in the turn sequence.\nThe target recovers 1 Action Point.\nCost: 5 AP, 20 Fat",
-      "Tier 7": "Inspiring Presence (requires Banner)\nAny ally who is adjacent to an enemy, or is adjacent to an ally who is adjacent to an enemy, gains +3 Action Points as long as they start their turn adjacent to you.\nOnly members of your company are considered allies for this perk."
-    },
-    "Tactician": {
-      "Tier 3": "Shield Sergeant\n Allies with a Shield will use Shieldwall for free at the start of each battle.\nAllies within 2 tiles will have the Action Point and Fatigue costs of their Shieldwall halved. Cannot reduce the Action Point cost below 2.\nIf you have the Shieldwall skill available, any ally who starts or ends their turn adjacent to you will use Shieldwall for free.\nOnly members of your company are considered allies for the purposes of this perk.",
-      "Tier 4": "Onslaught\nUnlocks the Onslaught skill, which allows you and nearby members of your company within 4 tiles who are not stunned, sleeping or fleeing to gain +10 Melee Skill, +20 Initiative and one use of the Linebreaker skill for one turn. This use of Linebreaker costs 1 less Action Point and builds 10 less Fatigue.\nCan only be used once per combat.\nCost: 7 AP 30 Fat",
-      "Tier 5": "Hold Steady\nUnlocks the Hold Steady skill, which allows you and other members of your company within 4 tiles, who are not stunned, sleeping or fleeing to gain +10 Melee Defense, +10 Ranged Defense and immunity to being stunned, knocked back or grabbed.\nCan only be used once per combat.\nCost: 7AP 30 Fat",
-      "Tier 7": "Blitzkrieg\nYou and allies of your faction within 4 tiles who have at least 10 Fatigue remaining and are are not stunned, sleeping or fleeing gain the Adrenaline effect and build 10 fatigue.\nUsable once per day combat and cannot be used by more than one character.\nCost: 7AP 30 Fat"
     },
     "Tough": {
       "Tier 1": "Colossus\nHitpoints are increased by 25%, which also reduces the chance to sustain debilitating injuries when being hit.",
@@ -7862,6 +7845,12 @@
       "Tier 4": "Decisive\nGain a stack whenever you end your turn without having used Wait, up to a maximum of 3 stacks.\nGain +15 Resolve and Initiative while you have at least 1 stack.\nSkills build up 15% less Fatigue while you have at least 2 stacks.\nDeal 15% additional damage while you have 3 stacks.\nYou lose all stacks if you use Wait.",
       "Tier 6": "Fresh and Furious\nThe Action Point cost of the first skill that costs Action Points used every turn is halved.\nThe effect becomes disabled if you start a turn with 30% Fatigue built and remains disabled until you use Recover.",
       "Tier 7": "Indomitable\n Unlocks the Indomitable skill which grants a 50% damage reduction and immunity to being stunned, knocked back or grabbed for one turn.\nIncrease damage by 25% after receiving a hit that lasts until your next attack or the end of your turn.\nCost: 5 AP 25 Fat"
+    },
+    "Tactician": {
+      "Tier 3": "Shield Sergeant\n Allies with a Shield will use Shieldwall for free at the start of each battle.\nAllies within 2 tiles will have the Action Point and Fatigue costs of their Shieldwall halved. Cannot reduce the Action Point cost below 2.\nIf you have the Shieldwall skill available, any ally who starts or ends their turn adjacent to you will use Shieldwall for free.\nOnly members of your company are considered allies for the purposes of this perk.",
+      "Tier 4": "Onslaught\nUnlocks the Onslaught skill, which allows you and nearby members of your company within 4 tiles who are not stunned, sleeping or fleeing to gain +10 Melee Skill, +20 Initiative and one use of the Linebreaker skill for one turn. This use of Linebreaker costs 1 less Action Point and builds 10 less Fatigue.\nCan only be used once per combat.\nCost: 7 AP 30 Fat",
+      "Tier 5": "Hold Steady\nUnlocks the Hold Steady skill, which allows you and other members of your company within 4 tiles, who are not stunned, sleeping or fleeing to gain +10 Melee Defense, +10 Ranged Defense and immunity to being stunned, knocked back or grabbed.\nCan only be used once per combat.\nCost: 7AP 30 Fat",
+      "Tier 7": "Blitzkrieg\nYou and allies of your faction within 4 tiles who have at least 10 Fatigue remaining and are are not stunned, sleeping or fleeing gain the Adrenaline effect and build 10 fatigue.\nUsable once per day combat and cannot be used by more than one character.\nCost: 7AP 30 Fat"
     },
     "Knave": {
       "Tier 1": "Trickster's Purses\nUnlock 2 extra bag slots.\nUnlocks the Throw Pocket Sand skill which allows you to store sand in your empty bag slots with which to distract nearby enemies, reducing Damage and Initiative by 35%.",
@@ -7971,6 +7960,11 @@
       "Tier 4": "Throwing Mastery\nSkills build up 25% less Fatigue.\nDamage is increased by 30% when attacking at a distance of 2 tiles and by 20% when attacking at a distance of 3 tiles.\nHits from throwing attacks now apply certain debuffs on the target. Piercing type attacks have a 50% chance to inflict the Arrow to the Knee effect. Cutting type attacks always apply the Overwhelmed effect. Blunt type attacks have a 50% chance to inflict staggered and if the target is already staggered, 100% chance to inflict stunned.",
       "Tier 5": "Opportunist (requires Throwing Weapon)\nThe first 2 Throwing attacks during a battle have their Action Point costs halved. This effect only lasts until the end of your second turn.\nWhen using a throwing weapon which uses ammo, whenever you end your movement over an enemy's corpse during your turn, recover 1 ammo. Immediately afterward, the next throwing attack costs no Action Points and builds 50% less Fatigue.\nA corpse can only be used once per combat and cannot be used by multiple characters with this perk."
     },
+    "Heavy Armor": {
+      "Tier 3": "Brawny\nThe fatigue and initiative penalty from wearing armor and helmet is reduced by 30%.",
+      "Tier 5": "Bulwark\nGain 5% of your combined current head and body armor durability as additional Resolve. This bonus is doubled against negative Morale Checks except mental attacks.",
+      "Tier 6": "Battleforged\nArmor damage taken is reduced by a percentage equal to 5% of the current total armor value of both body and head armor.\nWhen attacking a target against whom you have a Reach Disadvantage, reduce this disadvantage by 1 for every 300 current combined head and body armor durability you have.\nDoes not affect damage from mental attacks or status effects.\nCannot be learned if you have Nimble or Poise."
+    },
     "Light Armor": {
       "Tier 2": "Relentless\nAt all times your Initiative is reduced only by 50% of your accumulated Fatigue, instead of all of it. In addition, using the Wait command will no longer give you a penalty to Initiative in the next round.",
       "Tier 3": "Dodge\nGain 15% of the character's current Initiative as a bonus to Melee and Ranged Defense.",
@@ -7981,10 +7975,12 @@
       "Tier 3": "Dodge\nGain 15% of the character's current Initiative as a bonus to Melee and Ranged Defense.",
       "Tier 6": "Poise\nDamage to Hitpoints is reduced by 30% and to armor by 20%.\nThe bonus drops exponentially when wearing head and body armor with a total penalty to Maximum Fatigue above 30% of your Base Fatigue including traits and permanent injuries. This perk will always provide the full bonus when wearing head and body armor with a total penalty to Maximum Fatigue of 35 or below.\nDoes not affect damage from mental attacks or status effects, but can help to avoid receiving them.\nWhen attacking a target against whom you have a Reach Disadvantage, reduce this disadvantage by 1 if your Initiative is greater than that of your target.\nBrawny does not affect this perk.\nCannot be learned if you have Nimble or Battleforged."
     },
-    "Heavy Armor": {
-      "Tier 3": "Brawny\nThe fatigue and initiative penalty from wearing armor and helmet is reduced by 30%.",
-      "Tier 5": "Bulwark\nGain 5% of your combined current head and body armor durability as additional Resolve. This bonus is doubled against negative Morale Checks except mental attacks.",
-      "Tier 6": "Battleforged\nArmor damage taken is reduced by a percentage equal to 5% of the current total armor value of both body and head armor.\nWhen attacking a target against whom you have a Reach Disadvantage, reduce this disadvantage by 1 for every 300 current combined head and body armor durability you have.\nDoes not affect damage from mental attacks or status effects.\nCannot be learned if you have Nimble or Poise."
+    "Swift": {
+      "Tier 1": "Fast Adaptation\nGain an additional stacking +10% hitchance with each attack that misses an opponent. Bonus is reset upon landing a hit.",
+      "Tier 2": "Vigorous Assault",
+      "Tier 4": "Offhand Training \n(requires Offhand Item weighing less than 10)\nOnce per turn, the first use of your offhand item weighing less than 10 costs no Action Points.\nGain Trip Artist when wielding a net.\n\nTrip Artist (requires Throwing Net)\nThe first melee attack every turn against an adjacent target will apply the staggered effect on a hit.\nWhen wielding a weapon with a Reach of less than 4, gain the difference in Reach up to 4.",
+      "Tier 5": "Double Strike (requires Melee Attack)\nA successful hit increases the damage of your next attack by 20%.\nThe effect is lost upon moving, swapping an item, using any skill except a single-target attack, missing an attack, or waiting or ending your turn.",
+      "Tier 6": "Duelist\n(requires Weapon whose primary melee attack has a Base Action Point cost of 4 or less) \nAdditional damage ignores armor. This bonus is 25% for one-handed weapons, 35% for one-handed weapon with shield, and 15% for two-handed weapons.\nShields now also negate the Reach Advantage of the target when attacking."
     },
     "Power": {
       "Tier 1": "Crippling Strikes\nLowers the threshold to inflict Injuries by 33% for both Melee and Ranged Attacks.  Attacks can now inflict Injuries on Undead.",
@@ -8007,66 +8003,61 @@
       "Tier 5": "Rebuke\nGain the Rebuke effect during combat which grants a 25% chance to perform an attack against an adjacent opponent who misses a melee attack against you. This attack costs no Action Point but can only trigger if you have enough Fatigue to afford it. A resolve check is triggered for you, and if successful, the attack builds no Fatigue.\nWhen wielding a shield, the chance is increased by an additional +15% and the attack does not build or require any Fatigue.",
       "Tier 6": "Duelist"
     },
-    "Swift": {
-      "Tier 1": "Fast Adaptation\nGain an additional stacking +10% hitchance with each attack that misses an opponent. Bonus is reset upon landing a hit.",
-      "Tier 2": "Vigorous Assault",
-      "Tier 4": "Offhand Training \n(requires Offhand Item weighing less than 10)\nOnce per turn, the first use of your offhand item weighing less than 10 costs no Action Points.\nGain Trip Artist when wielding a net.\n\nTrip Artist (requires Throwing Net)\nThe first melee attack every turn against an adjacent target will apply the staggered effect on a hit.\nWhen wielding a weapon with a Reach of less than 4, gain the difference in Reach up to 4.",
-      "Tier 5": "Double Strike (requires Melee Attack)\nA successful hit increases the damage of your next attack by 20%.\nThe effect is lost upon moving, swapping an item, using any skill except a single-target attack, missing an attack, or waiting or ending your turn.",
-      "Tier 6": "Duelist\n(requires Weapon whose primary melee attack has a Base Action Point cost of 4 or less) \nAdditional damage ignores armor. This bonus is 25% for one-handed weapons, 35% for one-handed weapon with shield, and 15% for two-handed weapons.\nShields now also negate the Reach Advantage of the target when attacking."
-    },
-    "Discovered Talent": {
-      "Tier 1": "1.0",
-      "Tier 2": "Discovered Talent\nEvery time you spend a level-up, gain between 1 and 3 talent stars in a random attribute in which you have fewer than 3 stars.\nCan only trigger once per attribute and cannot increase the number of talent stars in an attribute beyond 3.",
-      "Tier 4": "Deep Cuts",
-      "Tier 5": "Deep Cuts (requires Cutting Damage)\nDuring your turn, after a successful attack against a target, all subsequent attacks have a 33% reduced threshold to inflict injury and will inflict Bleeding. If any of the attacks inflicted an injury, the attacks inflict additional Bleeding.\nThe effect expires upon switching your target, moving, swapping an item, waiting or ending your turn, or using any skill except a cutting attack."
-    },
-    "Gifted": {
-      "Tier 1": "1.0",
-      "Tier 2": "Gifted\nInstantly gain a levelup to increase this character's attributes with maximum rolls, but without talents.",
-      "Tier 4": "Follow Up",
-      "Tier 5": "Follow Up (requires Two-Handed Melee Weapon)\nUnlocks the Follow Up skill, which while not engaged in Melee allows you to do a free attack with -30% Damage against enemies in your attack range who are successfully hit by your allies until your next turn. Adds -10% to the Damage Reduction for each attack, up to a maximum of -90%.\nCost: 4 AP 30 Fat"
-    },
-    "Professional": {
-      "Tier 1": "1.0",
-      "Tier 2": "Professional\nGain the first two perks in a random melee perk group that you have access to.\nDoes not refund already spend perk points.",
-      "Tier 4": "Mentor's Presence (skill)",
-      "Tier 5": "Mentor's Presence\nThe student of this character gains the Mentor's Presence effect.\nIf the student dies, this character will immediately recover 50% of built Fatigue and gain the Adrenaline effect."
-    },
-    "Student": {
-      "Tier 1": "1.0",
-      "Tier 2": "Student\nGain additional 20% Experience from battle. At the eleventh Character Level, you gain an additional Perk Point.\nWhen playing the Manhunters origin, your Indebted get the perk point refunded at the seventh Character Level.",
-      "Tier 4": "Mentor's Presence (effect)",
-      "Tier 5": "Mentor's Presence\nWhen in the presence of your mentor, gain multiple bonuses.\nAt the start of every turn, improve morale to confident. \nGain the Duelist and Rebuke perks, +10 Melee Skill, Melee Defense and Ranged Defense and +20 Resolve.\nWill lose 2 levels of morale upon the mentor's death."
-    },
     "Back To Basics": {
-      "Tier 1": "5.0",
       "Tier 2": "Back to Basics\nGain 2 Perk Points.\nDrop your perk tier down to 2.",
       "Tier 4": "Return Favor (effect)",
       "Tier 5": "Return Favor (requires Melee Weapon or Unarmed)\nUnlocks the Return Favor skill which when active has a 10% chance to stun, 50% chance to daze and 75% chance to stagger any opponent missing a melee attack against this character.\nImmunities and resistances against being stunned still apply."
     },
+    "Discovered Talent": {
+      "Tier 2": "Discovered Talent\nEvery time you spend a level-up, gain between 1 and 3 talent stars in a random attribute in which you have fewer than 3 stars.\nCan only trigger once per attribute and cannot increase the number of talent stars in an attribute beyond 3.",
+      "Tier 4": "Deep Cuts",
+      "Tier 5": "Deep Cuts (requires Cutting Damage)\nDuring your turn, after a successful attack against a target, all subsequent attacks have a 33% reduced threshold to inflict injury and will inflict Bleeding. If any of the attacks inflicted an injury, the attacks inflict additional Bleeding.\nThe effect expires upon switching your target, moving, swapping an item, waiting or ending your turn, or using any skill except a cutting attack."
+    },
     "Fencer": {
-      "Tier 1": "7.0",
       "Tier 2": "Fencer (requires Fencing Sword)\nSkills build up 20% less Fatigue and gain +10% chance to hit.\nThe Damage Type requirement from Kata Step is removed.\nWhen using a one-handed fencing sword, the Action Point costs of Sword Thrust, Riposte and Lunge are reduced by 1.\nWhen using a two-handed fencing sword, the range of Lunge is increased by 1 tile.",
       "Tier 4": "Soul Link",
       "Tier 5": "Soul Link\nAll incoming damage to Hitpoints is reduced by 40%. Hitpoint damage reduced is transferred to a random adjacent ally.\nAllies with Soul Link cannot be the target of this ability."
     },
+    "Gifted": {
+      "Tier 2": "Gifted\nInstantly gain a levelup to increase this character's attributes with maximum rolls, but without talents.",
+      "Tier 4": "Follow Up",
+      "Tier 5": "Follow Up (requires Two-Handed Melee Weapon)\nUnlocks the Follow Up skill, which while not engaged in Melee allows you to do a free attack with -30% Damage against enemies in your attack range who are successfully hit by your allies until your next turn. Adds -10% to the Damage Reduction for each attack, up to a maximum of -90%.\nCost: 4 AP 30 Fat"
+    },
+    "Leadership": {
+      "Tier 1": "Supporter\nOnce per turn, after you use a skill targeting an adjacent ally, recover 3 Action Points.\nGain Encourage.\n\nEncourage\n Trigger a positive morale check for an ally within 2 tiles with a bonus of 50% of your Resolve.\nCan only be used on characters who are of your faction and whose morale is lower than yours per tile of distance they are away.\nCannot be used on fleeing or stunned targets.\nOnly usable once per turn.\nCost: 4 AP 15 Fat",
+      "Tier 2": "Rally the Troops\nTriggers a morale check to raise the morale of anyone of your faction who is wavering or worse within 4 tiles distance, with a bonus to Resolve of 40% of your Resolve. The bonus is lowered by -10 per tile distance except for Fleeing targets.\nRemoves the Sleeping status effect on allies within range.\nCost: 5 AP, 25 Fat",
+      "Tier 3": "Fortified Mind",
+      "Tier 4": "Polearm Mastery",
+      "Tier 5": "Command\nUnlocks the Command skill which can be used on an ally within 3 tiles to move them to the next position in the turn sequence.\nThe target recovers 1 Action Point.\nCost: 5 AP, 20 Fat",
+      "Tier 7": "Inspiring Presence (requires Banner)\nAny ally who is adjacent to an enemy, or is adjacent to an ally who is adjacent to an enemy, gains +3 Action Points as long as they start their turn adjacent to you.\nOnly members of your company are considered allies for this perk."
+    },
     "Man Of Steel": {
-      "Tier 1": "7.0",
       "Tier 2": "Man of Steel\nArmor penetrating damage received is reduced by a percentage equal to 10% of the current durability of the armor piece hit.",
       "Tier 4": "Sundering Strikes",
       "Tier 5": "Sundering Strikes\nEffectiveness vs. Armor is increased by +20% for any weapon used."
     },
     "Marksmanship": {
-      "Tier 1": "7.0",
       "Tier 2": "Marksmanship (requires Ranged Weapon)\nGain 10% of your Base Ranged Skill as additional Minimum and Maximum Damage.",
       "Tier 4": "Through the Ranks",
       "Tier 5": "Through the Ranks\nRanged attacks have a 50% reduced chance to inflict friendly fire."
     },
+    "Professional": {
+      "Tier 2": "Professional\nGain the first two perks in a random melee perk group that you have access to.\nDoes not refund already spend perk points.",
+      "Tier 4": "Mentor's Presence (skill)",
+      "Tier 5": "Mentor's Presence\nThe student of this character gains the Mentor's Presence effect.\nIf the student dies, this character will immediately recover 50% of built Fatigue and gain the Adrenaline effect."
+    },
     "Rising Star": {
-      "Tier 1": "7.0",
       "Tier 2": "Rising Star\nExperience gained is increased by 20% for the next 5 levels and by 5% after that.\nGain 2 perk points upon completing your next 5 levels after picking this perk.",
-      "Tier 4": "Vengeful Spite",
-      "Tier 5": "Vengeful Spite\nWhenever an ally dies adjacent to this character, gain a stacking 5% increased damage for the remainder of the combat."
+      "Tier 4": "Wear them Down",
+      "Tier 5": "Wear them Down\nSuccessful attacks apply the Worn Down effect on the target, increasing Fatigue cost by 10% and reducing Initiative by -10%.\nGain a stacking 20% chance that an enemy requires two successful rolls to hit you per negative status effect affecting the enemy.\nValid status effects include: worn down, stunned, dazed, rattled, netted, sleeping, staggered, rooted, webbed"
+    },
+    "Student": {
+      "Tier 2": "Student\nGain additional 20% Experience from battle. At the eleventh Character Level, you gain an additional Perk Point.\nWhen playing the Manhunters origin, your Indebted get the perk point refunded at the seventh Character Level.",
+      "Tier 4": "Mentor's Presence (effect)",
+      "Tier 5": "Mentor's Presence\nWhen in the presence of your mentor, gain multiple bonuses.\nAt the start of every turn, improve morale to confident. \nGain the Duelist and Rebuke perks, +10 Melee Skill, Melee Defense and Ranged Defense and +20 Resolve.\nWill lose 2 levels of morale upon the mentor's death."
+    },
+    "General": {
+      "Tier 1": "Bags and Belts\nUnlock two extra bag slots.\nItems placed in bags no longer apply a penalty to Maximum Fatigue, except for two-handed weapons"
     }
   },
   "builds": {}

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 from data_loader import load_data, DataError, _load_settings, _save_settings
 from engine import SkillEngine
 from icon_provider import IconProvider
+from i18n import set_lang as i18n_set_lang, t
 
 
 def exe_dir():
@@ -43,6 +44,7 @@ class MainWindow(QMainWindow):
         # lang
         s = _load_settings(exe_dir())
         self.lang = s.get("lang", "zh")
+        i18n_set_lang(self.lang)
 
         # load data
         self.gd = None
@@ -68,12 +70,29 @@ class MainWindow(QMainWindow):
             return
         nl = "en" if self.lang == "zh" else "zh"
         self.lang = nl
+        i18n_set_lang(nl)
         try:
             _save_settings(exe_dir(), {"lang": nl})
         except Exception:
             pass
         self.gd.set_lang(nl)
         self._update_nav_labels()
+        # refresh language button text & tooltip
+        if hasattr(self, "lang_btn"):
+            self.lang_btn.setText("English" if nl == "zh" else "中文")
+            self.lang_btn.setToolTip("切换到 English" if nl == "zh" else "Switch to 中文")
+        # retranslate + data refresh for all tabs
+        for pg in [getattr(self, "forward_tab", None),
+                   getattr(self, "reverse_tab", None),
+                   getattr(self, "builds_tab", None),
+                   getattr(self, "about_tab", None)]:
+            if pg is None:
+                continue
+            if hasattr(pg, "retranslate"):
+                try:
+                    pg.retranslate()
+                except Exception:
+                    pass
         for pg in [getattr(self, "forward_tab", None),
                    getattr(self, "reverse_tab", None),
                    getattr(self, "builds_tab", None)]:
@@ -107,11 +126,11 @@ class MainWindow(QMainWindow):
         nl.setSpacing(0)
         nl.addSpacing(10)
 
-        t = QLabel("Skill Simulator")
-        t.setObjectName("nav_button")
-        f = QFont(); f.setPointSize(14); f.setBold(True); t.setFont(f)
-        t.setStyleSheet("border-left:3px solid #B8860B;padding-left:11px;")
-        nl.addWidget(t)
+        ttl = QLabel("Skill Simulator")
+        ttl.setObjectName("nav_button")
+        f = QFont(); f.setPointSize(14); f.setBold(True); ttl.setFont(f)
+        ttl.setStyleSheet("border-left:3px solid #B8860B;padding-left:11px;")
+        nl.addWidget(ttl)
         nl.addSpacing(12)
 
         # use QListWidget for reliable nav
@@ -136,13 +155,14 @@ class MainWindow(QMainWindow):
 
         # lang toggle + version at bottom
         nl.addSpacing(6)
-        lt = "EN" if self.lang == "zh" else "ZH"
+        # show target language: Chinese UI shows "English", English UI shows "中文"
+        lt = "English" if self.lang == "zh" else "中文"
         self.lang_btn = QPushButton(lt)
-        self.lang_btn.setToolTip("Switch language")
+        self.lang_btn.setToolTip("切换到 English" if self.lang == "zh" else "Switch to 中文")
         self.lang_btn.setCursor(Qt.PointingHandCursor)
         self.lang_btn.setStyleSheet(
             "QPushButton{font-size:11px;color:#9B9285;border:1px solid #3A3024;"
-            "border-radius:4px;padding:2px 8px;margin:4px 14px;}"
+            "border-radius:4px;padding:2px 8px;margin:4px 14px;min-width:72px;}"
             "QPushButton:hover{color:#C8BFA8;border-color:#B8860B;}")
         self.lang_btn.clicked.connect(self._toggle_lang)
         nl.addWidget(self.lang_btn)
@@ -185,10 +205,10 @@ class MainWindow(QMainWindow):
         w = QWidget()
         l = QVBoxLayout(w)
         l.setAlignment(Qt.AlignCenter)
-        t = QLabel("DATA LOAD FAILED")
-        t.setStyleSheet("font-size:22px;font-weight:bold;color:#c0392b;")
-        t.setAlignment(Qt.AlignCenter)
-        l.addWidget(t)
+        tt = QLabel("DATA LOAD FAILED")
+        tt.setStyleSheet("font-size:22px;font-weight:bold;color:#c0392b;")
+        tt.setAlignment(Qt.AlignCenter)
+        l.addWidget(tt)
         detail = self._data_error or "(no details)"
         m = QLabel(detail + "\n\npath: " + str(self.data_path))
         m.setWordWrap(True)
@@ -226,7 +246,7 @@ class MainWindow(QMainWindow):
     def _build_statusbar(self):
         sb = QStatusBar()
         self.setStatusBar(sb)
-        sb.showMessage("v0.0.2", 0)
+        sb.showMessage("v0.0.3", 0)
 
     def _on_nav(self, row):
         self.stack.setCurrentIndex(row)

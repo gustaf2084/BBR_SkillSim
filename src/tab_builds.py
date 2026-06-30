@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 tab_builds.py
-流派推荐页：自动数据分析 + 自定义流派方案（builds/*.txt）。
+Build recommendations page: auto analysis + custom build files (builds/*.txt).
 """
 
 import os
@@ -19,12 +19,7 @@ from PySide6.QtGui import QColor, QBrush, QFont
 
 from skill_tree_widget import SkillTreeWidget
 from build_parser import scan_builds, generate_template, create_example_file
-
-# 类别配置
-CAT_ZH = {
-    "Shared": "共有", "Exclusive": "专属", "Weapon": "武器",
-    "Armor": "护甲", "Fighting Style": "风格", "Special": "特殊", "Always": "常驻",
-}
+from i18n import t
 
 
 def _app_dir():
@@ -34,7 +29,7 @@ def _app_dir():
 
 
 class BuildsTab(QWidget):
-    """流派推荐页面。"""
+    """Build recommendations page."""
 
     def __init__(self):
         super().__init__()
@@ -43,25 +38,26 @@ class BuildsTab(QWidget):
         self.icon_provider = None
         self._last_results = None
         self._current_bg_id = None
-        self._builds_data = []      # list of BuildData
-        self._build_tag_btns = []   # QPushButton for each build
+        self._builds_data = []          # list of BuildData
+        self._build_tag_btns = []       # QPushButton for each build
+        self._current_build_idx = -1
 
         self._build_ui()
 
-    # ── UI 构建 ──────────────────────────────────────────────
+    # ── UI construction ──────────────────────────────────────────
 
     def _build_ui(self):
         root = QVBoxLayout(self)
         splitter = QSplitter(Qt.Horizontal)
 
-        # ── 左侧：背景列表 ──
+        # ── LEFT: background list ──
         left = QWidget()
         lv = QVBoxLayout(left)
         lv.setSpacing(6)
 
-        bg_label = QLabel("选择背景:")
-        bg_label.setObjectName("section_title")
-        lv.addWidget(bg_label)
+        self._bg_label = QLabel(t("builds.bg_label"))
+        self._bg_label.setObjectName("section_title")
+        lv.addWidget(self._bg_label)
 
         self.bg_list = QListWidget()
         self.bg_list.currentItemChanged.connect(self._on_bg_changed)
@@ -69,33 +65,33 @@ class BuildsTab(QWidget):
 
         splitter.addWidget(left)
 
-        # ── 右侧：内容区 ──
+        # ── RIGHT: content area ──
         right = QWidget()
         rv = QVBoxLayout(right)
         rv.setContentsMargins(0, 0, 0, 0)
         rv.setSpacing(8)
 
-        # 标题
+        # title
         self.title = QLabel("")
         self.title.setObjectName("page_title")
         rv.addWidget(self.title)
 
-        # ── 自定义流派区 ──
+        # ── custom build section ──
         self.custom_section = QWidget()
         self.custom_section.setVisible(False)
         cv = QVBoxLayout(self.custom_section)
         cv.setContentsMargins(0, 0, 0, 0)
         cv.setSpacing(6)
 
-        # 流派标签栏
+        # build tag bar
         tag_bar = QWidget()
         tag_layout = QHBoxLayout(tag_bar)
         tag_layout.setContentsMargins(0, 0, 0, 0)
         tag_layout.setSpacing(4)
 
-        tag_lbl = QLabel("自定义流派：")
-        tag_lbl.setStyleSheet("font-size: 12px; font-weight: bold; color: #6B6359;")
-        tag_layout.addWidget(tag_lbl)
+        self._build_tag_lbl = QLabel(t("builds.custom_label"))
+        self._build_tag_lbl.setStyleSheet("font-size: 12px; font-weight: bold; color: #6B6359;")
+        tag_layout.addWidget(self._build_tag_lbl)
 
         self.tag_scroll = QScrollArea()
         self.tag_scroll.setWidgetResizable(True)
@@ -110,8 +106,8 @@ class BuildsTab(QWidget):
         self.tag_scroll.setWidget(self.tag_container)
         tag_layout.addWidget(self.tag_scroll, 1)
 
-        # 按钮组
-        self.new_btn = QPushButton("+ 新建流派")
+        # button group
+        self.new_btn = QPushButton(t("builds.new_btn"))
         self.new_btn.setStyleSheet(
             "QPushButton { font-size: 11px; padding: 2px 10px; "
             "background: transparent; border: 1px dashed #C8BFA8; border-radius: 12px; }"
@@ -119,7 +115,7 @@ class BuildsTab(QWidget):
         self.new_btn.clicked.connect(self._on_new_build)
         tag_layout.addWidget(self.new_btn)
 
-        self.edit_btn = QPushButton("📝 编辑")
+        self.edit_btn = QPushButton(t("builds.edit_btn"))
         self.edit_btn.setStyleSheet(
             "QPushButton { font-size: 11px; padding: 2px 8px; "
             "background: transparent; border: 1px solid #DDD6CC; border-radius: 4px; }"
@@ -128,7 +124,7 @@ class BuildsTab(QWidget):
         tag_layout.addWidget(self.edit_btn)
 
         self.folder_btn = QPushButton("📂")
-        self.folder_btn.setToolTip("打开 builds 文件夹")
+        self.folder_btn.setToolTip(t("builds.folder_tip"))
         self.folder_btn.setStyleSheet(
             "QPushButton { font-size: 11px; padding: 2px 6px; "
             "background: transparent; border: 1px solid #DDD6CC; border-radius: 4px; }"
@@ -138,13 +134,13 @@ class BuildsTab(QWidget):
 
         cv.addWidget(tag_bar)
 
-        # 流派详细内容
+        # build detail
         self.build_detail = QWidget()
         self.build_detail.setObjectName("card")
         bdv = QVBoxLayout(self.build_detail)
         bdv.setSpacing(8)
 
-        # 推荐特性提示
+        # recommended traits hint
         self.build_traits_hint = QLabel("")
         self.build_traits_hint.setStyleSheet(
             "font-size: 12px; color: #8B6914; background: #FDF8F0; "
@@ -152,9 +148,14 @@ class BuildsTab(QWidget):
         self.build_traits_hint.setVisible(False)
         bdv.addWidget(self.build_traits_hint)
 
-        # 10 点技能表
+        # 10-point perk table
         self.perk_table = QTableWidget(0, 5)
-        self.perk_table.setHorizontalHeaderLabels(["#", "技能树组", "层级", "技能名", "出现概率"])
+        self._perk_headers = [
+            t("builds.perk_h_num"), t("builds.perk_h_group"),
+            t("builds.perk_h_tier"), t("builds.perk_h_perk"),
+            t("builds.perk_h_prob"),
+        ]
+        self.perk_table.setHorizontalHeaderLabels(self._perk_headers)
         self.perk_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
         self.perk_table.horizontalHeader().resizeSection(0, 30)
         self.perk_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
@@ -166,7 +167,7 @@ class BuildsTab(QWidget):
         self.perk_table.setMaximumHeight(380)
         bdv.addWidget(self.perk_table)
 
-        # 玩法建议
+        # playstyle suggestions
         self.playstyle_text = QLabel("")
         self.playstyle_text.setWordWrap(True)
         self.playstyle_text.setStyleSheet(
@@ -178,37 +179,35 @@ class BuildsTab(QWidget):
         cv.addWidget(self.build_detail)
         rv.addWidget(self.custom_section)
 
-        # ── 自动分析区 ──
-        auto_label = QLabel("自动数据分析")
-        auto_label.setObjectName("section_title")
-        rv.addWidget(auto_label)
+        # ── auto analysis section ──
+        self._auto_title = QLabel(t("builds.auto_title"))
+        self._auto_title.setObjectName("section_title")
+        rv.addWidget(self._auto_title)
 
         self.auto_cards = QWidget()
         ac_layout = QHBoxLayout(self.auto_cards)
         ac_layout.setSpacing(10)
         ac_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 三张卡片
-        self._card_defense = self._make_auto_card("🛡 防御核心")
-        self._card_offense = self._make_auto_card("⚔ 攻击方向")
-        self._card_special = self._make_auto_card("⭐ 特殊潜力")
+        # three cards
+        self._card_defense = self._make_auto_card(t("builds.card_defense"), "defense")
+        self._card_offense = self._make_auto_card(t("builds.card_offense"), "offense")
+        self._card_special = self._make_auto_card(t("builds.card_special"), "special")
         ac_layout.addWidget(self._card_defense, 1)
         ac_layout.addWidget(self._card_offense, 1)
         ac_layout.addWidget(self._card_special, 1)
 
         rv.addWidget(self.auto_cards)
 
-        # ── 引导提示（无自定义方案时） ──
-        self.guide_hint = QLabel(
-            "💡 想在 <b>builds/</b> 目录中创建流派方案文件，自定义推荐加点。"
-            "点击「+ 新建流派」即可开始。")
+        # ── guide hint (when no custom builds) ──
+        self.guide_hint = QLabel(t("builds.guide"))
         self.guide_hint.setStyleSheet(
             "font-size: 12px; color: #6B6359; padding: 6px 12px; "
             "background: #F5F0E8; border-radius: 4px;")
         self.guide_hint.setVisible(False)
         rv.addWidget(self.guide_hint)
 
-        # ── 技能树矩阵 ──
+        # ── skill tree matrix ──
         self.skill_tree = SkillTreeWidget(icon_provider=self.icon_provider)
         rv.addWidget(self.skill_tree, 1)
 
@@ -216,7 +215,7 @@ class BuildsTab(QWidget):
         splitter.setSizes([280, 900])
         root.addWidget(splitter, 1)
 
-    def _make_auto_card(self, title_text):
+    def _make_auto_card(self, title_text, card_id):
         card = QFrame()
         card.setObjectName("card")
         clv = QVBoxLayout(card)
@@ -224,15 +223,50 @@ class BuildsTab(QWidget):
         title = QLabel(title_text)
         title.setObjectName("section_title")
         clv.addWidget(title)
-        content = QLabel("选择背景后自动分析")
+        content = QLabel(t("builds.card_ph"))
         content.setWordWrap(True)
         content.setStyleSheet("font-size: 12px; color: #6B6359; line-height: 1.5;")
         content.setMinimumHeight(60)
         clv.addWidget(content, 1)
         card.setProperty("card_content", content)
+        setattr(self, f"_card_title_{card_id}", title)
+        setattr(self, f"_card_content_{card_id}", content)
         return card
 
-    # ── 数据就绪 ──────────────────────────────────────────────
+    # ── retranslate ──────────────────────────────────────────────
+
+    def retranslate(self):
+        """Refresh all static text to current language."""
+        self._bg_label.setText(t("builds.bg_label"))
+        self._build_tag_lbl.setText(t("builds.custom_label"))
+        self.new_btn.setText(t("builds.new_btn"))
+        self.edit_btn.setText(t("builds.edit_btn"))
+        self.folder_btn.setToolTip(t("builds.folder_tip"))
+        self._auto_title.setText(t("builds.auto_title"))
+        # auto card titles
+        for card_id in ["defense", "offense", "special"]:
+            title_lbl = getattr(self, f"_card_title_{card_id}", None)
+            if title_lbl:
+                title_lbl.setText(t(f"builds.card_{card_id}"))
+        self.guide_hint.setText(t("builds.guide"))
+        # perk table headers
+        self._perk_headers = [
+            t("builds.perk_h_num"), t("builds.perk_h_group"),
+            t("builds.perk_h_tier"), t("builds.perk_h_perk"),
+            t("builds.perk_h_prob"),
+        ]
+        self.perk_table.setHorizontalHeaderLabels(self._perk_headers)
+        # page title
+        if self._current_bg_id and self.gd:
+            self.title.setText(t("builds.page_title_prefix") + self.gd.bg_name(self._current_bg_id))
+        # refresh auto cards
+        if self._last_results is not None:
+            self._refresh_auto_cards(self._last_results)
+        # refresh current build detail
+        if self._current_build_idx >= 0 and self._current_build_idx < len(self._builds_data):
+            self._show_build_detail(self._builds_data[self._current_build_idx])
+
+    # ── data ready ──────────────────────────────────────────────
 
     def on_data_ready(self, gd, engine, icon_provider):
         self.gd = gd
@@ -248,49 +282,54 @@ class BuildsTab(QWidget):
         if self.bg_list.count() > 0:
             self.bg_list.setCurrentRow(0)
 
-    # ── 背景切换 ──────────────────────────────────────────────
+        # sync skill tree language, refresh tooltip if results exist
+        self.skill_tree.set_lang(getattr(gd, "lang", "zh"))
+        if self._last_results:
+            self._fill_skill_tree(self._last_results)
+
+        self.retranslate()
+
+    # ── background switch ────────────────────────────────────────
 
     def _on_bg_changed(self, current, previous):
         if current is None or self.gd is None or self.engine is None:
             return
         bg_id = current.data(Qt.UserRole)
         self._current_bg_id = bg_id
-        self.title.setText(f"流派推荐 — {self.gd.bg_name(bg_id)}")
+        self.title.setText(t("builds.page_title_prefix") + self.gd.bg_name(bg_id))
 
-        # 正向模拟
+        # forward simulate
         try:
             res = self.engine.forward_simulate(bg_id, [], mode="analytic")
         except Exception:
             res = None
         self._last_results = res
 
-        # 加载该背景的自定义流派
+        # load custom builds for this background
         self._load_builds(bg_id)
 
-        # 刷新自动分析卡片
+        # refresh auto analysis cards
         self._refresh_auto_cards(res)
 
-        # 刷新技能树
+        # refresh skill tree
         self._fill_skill_tree(res)
 
-    # ── 自动分析卡片 ──────────────────────────────────────────
+    # ── auto analysis cards ──────────────────────────────────────
 
     def _refresh_auto_cards(self, results):
         if results is None:
             for card_id in ["defense", "offense", "special"]:
-                widget = getattr(self, f"_card_{card_id}", None)
-                if widget:
-                    lbl = widget.property("card_content")
-                    if lbl:
-                        lbl.setText("（无可用方案）")
+                lbl = getattr(self, f"_card_content_{card_id}", None)
+                if lbl:
+                    lbl.setText(t("builds.card_none"))
             return
 
-        # 防御核心：护甲 + 盾 + 通用生存
+        # defense core: armor + shield + general survival
         defense_groups = {"Heavy Armor", "Medium Armor", "Light Armor", "Shield",
                           "Tough", "Unstoppable", "Agile", "Fast", "Trained", "Vigorous"}
         self._fill_card("defense", results, defense_groups)
 
-        # 攻击方向：武器 + 战斗风格
+        # offense direction: weapons + fighting styles
         offense_groups = {"Axe", "Bow", "Cleaver", "Crossbow", "Dagger", "Flail",
                           "Hammer", "Mace", "Polearm", "Spear", "Sword", "Throwing",
                           "Cross", "Whip",
@@ -298,7 +337,7 @@ class BuildsTab(QWidget):
                           "Ranged", "Ranged Fighting Style", "Shield Fighting Style"}
         self._fill_card("offense", results, offense_groups)
 
-        # 特殊潜力：专属 + 特殊 + 低概率但有价值的
+        # special potential: exclusive + special + low-prob but valuable
         special_groups = set()
         for g in self.gd.groups:
             cat = self.gd.group_category(g)
@@ -308,10 +347,7 @@ class BuildsTab(QWidget):
         self._fill_card("special", results, special_groups)
 
     def _fill_card(self, card_id, results, group_set):
-        widget = getattr(self, f"_card_{card_id}", None)
-        if widget is None:
-            return
-        lbl = widget.property("card_content")
+        lbl = getattr(self, f"_card_content_{card_id}", None)
         if lbl is None:
             return
 
@@ -323,7 +359,7 @@ class BuildsTab(QWidget):
         top10 = relevant[:10]
 
         if not top10:
-            lbl.setText("（无相关组）")
+            lbl.setText(t("builds.card_empty"))
             return
 
         html_parts = []
@@ -345,23 +381,26 @@ class BuildsTab(QWidget):
             )
         lbl.setText("".join(html_parts))
 
-    # ── 自定义流派 ────────────────────────────────────────────
+    # ── custom builds ────────────────────────────────────────────
 
     def _get_builds_dir(self):
         return os.path.join(_app_dir(), "builds")
 
     def _load_builds(self, bg_id):
-        """加载匹配当前背景的自定义流派方案。"""
+        """Load custom build files matching current background."""
         builds_dir = self._get_builds_dir()
 
-        # 首次启动：创建示例文件
-        create_example_file(builds_dir)
+        # first launch: create example file (failure shouldn't block the tab)
+        try:
+            create_example_file(builds_dir, lang=getattr(self.gd, "lang", "zh"))
+        except Exception:
+            pass
 
         all_builds = scan_builds(builds_dir)
         self._builds_data = [b for b in all_builds
                              if b.background == bg_id and b.is_valid()]
 
-        # 重建标签栏
+        # rebuild tag bar
         self._rebuild_tag_bar()
 
         if self._builds_data:
@@ -372,9 +411,10 @@ class BuildsTab(QWidget):
             self.custom_section.setVisible(False)
             self.guide_hint.setVisible(True)
             self._clear_build_detail()
+            self._current_build_idx = -1
 
     def _rebuild_tag_bar(self):
-        # 清旧
+        # clear old
         for btn in self._build_tag_btns:
             self.tag_layout_inner.removeWidget(btn)
             btn.deleteLater()
@@ -397,49 +437,50 @@ class BuildsTab(QWidget):
     def _select_build(self, idx):
         if idx < 0 or idx >= len(self._builds_data):
             return
+        self._current_build_idx = idx
         bd = self._builds_data[idx]
 
-        # 更新标签选中态
+        # update tag checked state
         for i, btn in enumerate(self._build_tag_btns):
             btn.setChecked(i == idx)
 
         self._show_build_detail(bd)
 
     def _show_build_detail(self, bd):
-        """在右侧展示流派详细内容。"""
-        # 推荐特性提示
+        """Display build detail on the right side."""
+        # recommended traits hint
         if bd.traits:
             trait_zh = []
             for tid in bd.traits:
                 tname = self.gd.trait_name(tid) if self.gd else tid
                 trait_zh.append(tname)
-            self.build_traits_hint.setText(f"推荐特性：{', '.join(trait_zh)}")
+            self.build_traits_hint.setText(t("builds.traits_hint_prefix") + ", ".join(trait_zh))
             self.build_traits_hint.setVisible(True)
         else:
             self.build_traits_hint.setVisible(False)
 
-        # 技能点表
+        # perk table
         self.perk_table.setRowCount(len(bd.perks))
         data_font = QFont("Consolas", 11)
         data_font.setStyleHint(QFont.Monospace)
 
         for row, (order, group, tier, perk_name) in enumerate(bd.perks):
-            # 序号
+            # order number
             order_item = QTableWidgetItem(str(order))
             order_item.setTextAlignment(Qt.AlignCenter)
             self.perk_table.setItem(row, 0, order_item)
 
-            # 技能树组
+            # skill tree group
             gname = self.gd.group_name(group) if self.gd else group
             self.perk_table.setItem(row, 1, QTableWidgetItem(gname))
 
-            # 层级
+            # tier
             self.perk_table.setItem(row, 2, QTableWidgetItem(tier))
 
-            # 技能名
+            # perk name
             self.perk_table.setItem(row, 3, QTableWidgetItem(perk_name))
 
-            # 该组在当前背景下的出现概率
+            # probability for this group under current background
             prob = 0
             if self._last_results and group in self._last_results:
                 prob = self._last_results[group]
@@ -449,7 +490,8 @@ class BuildsTab(QWidget):
 
             if prob < 0.20 and prob > 0:
                 prob_item.setForeground(QBrush(QColor("#C0392B")))
-                prob_item.setToolTip(f"⚠ 低概率：建议搭配特性提升 {gname} 组出现概率")
+                tip = t("builds.perk_low_tip").replace("{group}", gname)
+                prob_item.setToolTip(tip)
                 prob_item.setText(f"{prob*100:.1f}% ⚠")
             elif prob >= 0.80:
                 prob_item.setForeground(QBrush(QColor("#27704B")))
@@ -464,9 +506,9 @@ class BuildsTab(QWidget):
         else:
             self.playstyle_text.setVisible(False)
 
-        # 解析错误
+        # Parse errors
         if bd.parse_errors:
-            err_text = "解析问题：\n" + "\n".join(bd.parse_errors[:5])
+            err_text = t("builds.parse_err_prefix") + "\n" + "\n".join(bd.parse_errors[:5])
             self.playstyle_text.setText(err_text)
             self.playstyle_text.setStyleSheet(
                 "font-size: 11px; color: #C0392B; padding: 8px; "
@@ -478,16 +520,16 @@ class BuildsTab(QWidget):
         self.perk_table.setRowCount(0)
         self.playstyle_text.setVisible(False)
 
-    # ── 按钮事件 ──────────────────────────────────────────────
+    # ── button events ────────────────────────────────────────────
 
     def _on_new_build(self):
         if not self._current_bg_id:
             return
         name = self.gd.bg_name(self._current_bg_id) if self.gd else self._current_bg_id
         builds_dir = self._get_builds_dir()
-        filepath = generate_template(self._current_bg_id, name, builds_dir)
+        filepath = generate_template(self._current_bg_id, name, builds_dir, lang=getattr(self.gd, "lang", "zh"))
 
-        # 尝试用系统编辑器打开
+        # try to open with system editor
         try:
             if sys.platform == "win32":
                 os.startfile(filepath)
@@ -496,31 +538,29 @@ class BuildsTab(QWidget):
             else:
                 subprocess.Popen(["xdg-open", filepath])
         except Exception:
-            QMessageBox.information(self, "文件已创建",
-                                    f"流派文件已创建：\n{filepath}\n请用文本编辑器打开编辑。")
+            QMessageBox.information(self, t("builds.file_created_title"),
+                                    t("builds.file_created_body").replace("{path}", filepath))
 
-        # 重新加载
+        # reload
         self._load_builds(self._current_bg_id)
 
     def _on_edit_build(self):
-        """编辑当前选中的流派文件。"""
-        if not self._builds_data:
+        """Edit the currently selected build file."""
+        if not self._builds_data or self._current_build_idx < 0:
             return
-        # 找到当前选中的
-        for i, btn in enumerate(self._build_tag_btns):
-            if btn.isChecked() and i < len(self._builds_data):
-                bd = self._builds_data[i]
-                filepath = os.path.join(self._get_builds_dir(), bd.filename)
-                try:
-                    if sys.platform == "win32":
-                        os.startfile(filepath)
-                    elif sys.platform == "darwin":
-                        subprocess.Popen(["open", filepath])
-                    else:
-                        subprocess.Popen(["xdg-open", filepath])
-                except Exception:
-                    QMessageBox.warning(self, "错误", f"无法打开文件：{filepath}")
-                return
+        if self._current_build_idx < len(self._builds_data):
+            bd = self._builds_data[self._current_build_idx]
+            filepath = os.path.join(self._get_builds_dir(), bd.filename)
+            try:
+                if sys.platform == "win32":
+                    os.startfile(filepath)
+                elif sys.platform == "darwin":
+                    subprocess.Popen(["open", filepath])
+                else:
+                    subprocess.Popen(["xdg-open", filepath])
+            except Exception:
+                QMessageBox.warning(self, t("builds.open_err_title"),
+                                    t("builds.open_err_body") + filepath)
 
     def _on_open_folder(self):
         builds_dir = self._get_builds_dir()
@@ -533,9 +573,10 @@ class BuildsTab(QWidget):
             else:
                 subprocess.Popen(["xdg-open", builds_dir])
         except Exception:
-            QMessageBox.warning(self, "错误", f"无法打开文件夹：{builds_dir}")
+            QMessageBox.warning(self, t("builds.open_folder_err_title"),
+                                t("builds.open_folder_err_body") + builds_dir)
 
-    # ── 技能树矩阵 ────────────────────────────────────────────
+    # ── skill tree matrix ────────────────────────────────────────
 
     def _fill_skill_tree(self, results):
         if results is None:

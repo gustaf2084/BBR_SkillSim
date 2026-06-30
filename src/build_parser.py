@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 build_parser.py
-解析 builds/*.txt 流派方案文件。
+Parse builds/*.txt build definition files.
 
-文件格式：
+File format:
     [build]
-    name = 流派名称
+    name = build name
     background = background_id
-    traits = trait1, trait2  (可选)
-    tags = 坦克, 防御  (可选)
+    traits = trait1, trait2  (optional)
+    tags = tank, defense  (optional)
 
     [perks]
     1 = GroupName, Tier 3, PerkName
@@ -16,38 +16,40 @@ build_parser.py
     ...
 
     [playstyle]
-    自由文本，直到文件末尾或下一个 [section]
+    Free text until EOF or next [section]
 
-规则：
-- 空行和 # 开头的行为注释，忽略
-- 节标题 [xxx] 大小写不敏感
-- 键值对用第一个 = 分割，键去首尾空格
-- perks 节：序号 = 组名, 层级, 技能名
-- 编码：UTF-8
+Rules:
+- Blank lines and lines starting with # are comments, ignored
+- Section headers [xxx] are case-insensitive
+- Key=value split on first =, key trimmed
+- Perks section: order = group, tier, perk_name
+- Encoding: UTF-8
 """
 
 import os
 import re
+from i18n import t
 
 
 class BuildData:
-    """一个流派方案的数据对象。"""
+    """Data object for one build definition."""
+
     def __init__(self):
         self.filename = ""
         self.name = ""
         self.background = ""
-        self.traits = []       # list of trait_id
-        self.tags = []         # list of str
-        self.perks = []        # list of (order, group, tier, perk_name)
+        self.traits = []           # list of trait_id
+        self.tags = []             # list of str
+        self.perks = []            # list of (order, group, tier, perk_name)
         self.playstyle = ""
-        self.parse_errors = []  # list of str
+        self.parse_errors = []     # list of str
 
     def is_valid(self):
         return bool(self.name and self.background and self.perks)
 
 
 def parse_build_file(filepath):
-    """解析单个 .txt 文件，返回 BuildData 或 None。"""
+    """Parse a single .txt file, return BuildData or None."""
     if not os.path.isfile(filepath):
         return None
 
@@ -57,7 +59,7 @@ def parse_build_file(filepath):
     except Exception as e:
         bd = BuildData()
         bd.filename = os.path.basename(filepath)
-        bd.parse_errors.append(f"读取文件失败: {e}")
+        bd.parse_errors.append(t("parser.read_fail") + str(e))
         return bd
 
     bd = BuildData()
@@ -67,23 +69,23 @@ def parse_build_file(filepath):
     for lineno, raw in enumerate(lines, 1):
         line = raw.strip()
 
-        # 空行和注释
+        # blank lines and comments
         if not line or line.startswith("#"):
             continue
 
-        # 节标题
+        # section header
         if line.startswith("[") and line.endswith("]"):
             current_section = line[1:-1].strip().lower()
             continue
 
-        # 无章节：自由文本（playstyle 续行）
+        # no section: free text (playstyle continuation)
         if current_section == "playstyle":
             if bd.playstyle:
                 bd.playstyle += "\n"
             bd.playstyle += raw.rstrip()
             continue
 
-        # 键值对
+        # key=value
         if current_section and "=" in line:
             key, _, value = line.partition("=")
             key = key.strip().lower()
@@ -103,25 +105,27 @@ def parse_build_file(filepath):
                 try:
                     order = int(key)
                 except ValueError:
-                    bd.parse_errors.append(f"第 {lineno} 行：序号 '{key}' 不是数字")
+                    bd.parse_errors.append(
+                        t("parser.bad_order").format(lineno, key))
                     continue
                 parts = [p.strip() for p in value.split(",")]
                 if len(parts) < 3:
-                    bd.parse_errors.append(f"第 {lineno} 行：格式应为 '序号 = 组名, 层级, 技能名'")
+                    bd.parse_errors.append(
+                        t("parser.bad_format").format(lineno))
                     continue
                 group = parts[0]
                 tier = parts[1]
                 perk_name = parts[2]
                 bd.perks.append((order, group, tier, perk_name))
 
-    # 按序号排序
+    # sort by order
     bd.perks.sort(key=lambda x: x[0])
 
     return bd
 
 
 def scan_builds(builds_dir):
-    """扫描 builds/ 目录下所有 .txt 文件，返回 list[BuildData]。"""
+    """Scan builds/ directory for all .txt files, return list[BuildData]."""
     results = []
     if not os.path.isdir(builds_dir):
         return results
@@ -134,22 +138,51 @@ def scan_builds(builds_dir):
     return results
 
 
-def generate_template(background_id, build_name, builds_dir):
-    """生成一个空白流派模板文件，返回文件路径。"""
+def generate_template(background_id, build_name, builds_dir, lang="zh"):
+    """Generate a blank build template file, return file path."""
     os.makedirs(builds_dir, exist_ok=True)
-    safe_name = re.sub(r"[^a-zA-Z0-9_一-鿿]+", "_", build_name).strip("_")
+    safe_name = re.sub(r"[^a-zA-Z0-9_-]+", "_", build_name).strip("_")
     if not safe_name:
         safe_name = "new_build"
     filepath = os.path.join(builds_dir, f"{safe_name}.txt")
 
-    # 不覆盖已有文件
+    # don't overwrite existing files
     if os.path.exists(filepath):
         i = 2
         while os.path.exists(os.path.join(builds_dir, f"{safe_name}_{i}.txt")):
             i += 1
         filepath = os.path.join(builds_dir, f"{safe_name}_{i}.txt")
 
-    template = f"""# {build_name}
+    if lang == "en":
+        template = f"""# {build_name}
+# Build definition file. Edit and save — the app auto-reloads.
+# Blank lines and lines starting with # are comments.
+
+[build]
+name = {build_name}
+background = {background_id}
+traits =
+tags =
+
+[perks]
+# Format: order = Group, Tier, PerkName
+# Example: 1 = Trained, Tier 2, Pathfinder
+1 = , ,
+2 = , ,
+3 = , ,
+4 = , ,
+5 = , ,
+6 = , ,
+7 = , ,
+8 = , ,
+9 = , ,
+10 = , ,
+
+[playstyle]
+# Write playstyle notes, gear recommendations, battle tactics, etc. here.
+"""
+    else:
+        template = f"""# {build_name}
 # 流派方案文件。编辑后保存，软件自动加载。
 # 空行和 # 开头的行为注释。
 
@@ -181,15 +214,46 @@ tags =
     return filepath
 
 
-def create_example_file(builds_dir):
-    """在 builds/ 目录创建示例文件，仅当目录为空时。"""
+def create_example_file(builds_dir, lang="zh"):
+    """Create example file in builds/ directory, only when directory is empty."""
     os.makedirs(builds_dir, exist_ok=True)
     existing = [f for f in os.listdir(builds_dir) if f.endswith(".txt")]
     if existing:
         return None
 
-    filepath = os.path.join(builds_dir, "示例_贵族坦克.txt")
-    content = """# 贵族坦克 — 示例流派方案
+    if lang == "en":
+        filepath = os.path.join(builds_dir, "Example_NobleTank.txt")
+        content = """# Noble Tank — example build
+# This file is auto-generated as an example. You can edit or delete it.
+
+[build]
+name = Noble Tank
+background = adventurous_noble_background
+traits = Athletic, Brave
+tags = Tank, Defense, Frontline
+
+[perks]
+1 = Trained, Tier 2, Pathfinder
+2 = Heavy Armor, Tier 1, Brawny
+3 = Tactician, Tier 1, Shield Sergeant
+4 = Shield, Tier 1, Shield Bash
+5 = Trained, Tier 4, Death Dealer
+6 = Heavy Armor, Tier 3, Forge Bound
+7 = Noble, Tier 2, Rally the Troops
+8 = Shield, Tier 4, Shield Wall
+9 = Heavy Armor, Tier 6, Battle Forged
+10 = Tactician, Tier 7, Commander's Aura
+
+[playstyle]
+Frontline tank built around Heavy Armor + Shield.
+Trained provides mobility and resistances, Tactician strengthens team defense.
+Priority: max armor line (Brawny > Forge Bound > Battle Forged),
+then Shield control skills, finally Tactician aura.
+Athletic trait recommended to boost Agile group, or Brave for Leadership.
+"""
+    else:
+        filepath = os.path.join(builds_dir, "示例_贵族坦克.txt")
+        content = """# 贵族坦克 — 示例流派方案
 # 本文件是自动生成的示例，你可以编辑或删除它。
 
 [build]
