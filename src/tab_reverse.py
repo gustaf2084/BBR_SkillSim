@@ -414,7 +414,7 @@ class ReverseTab(QWidget):
             self._last_results = None
             return
 
-        multi = len([c for cbs in self._cat_checkboxes.values()
+        multi = len([cb for cbs in self._cat_checkboxes.values()
                      for cb, _ in cbs if cb.isChecked()]) > 1
         targets = []
         for cat, cbs in self._cat_checkboxes.items():
