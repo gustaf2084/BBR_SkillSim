@@ -22,6 +22,7 @@
 - `_setup_shortcuts()` 快捷键注册从未被调用
 - `build_simple.bat` 编码乱码
 - `_norepl_cache` 不同背景/特性配置下的缓存碰撞
+- 反向推导多目标时 NameError：`_finish_derive` 列表推导式变量名 `c` 应为 `cb`（触发条件：多目标且有结果时）
 
 ### 开发
 - 类型注解：engine.py + data_loader.py 完整类型标注
