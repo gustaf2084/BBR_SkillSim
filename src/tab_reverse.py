@@ -128,8 +128,8 @@ class ReverseTab(QWidget):
         adv_form.addRow(self.multi_trait_check)
 
         self.topn_spin = QSpinBox()
-        self.topn_spin.setRange(1, 200)
-        self.topn_spin.setValue(20)
+        self.topn_spin.setRange(5, 50)
+        self.topn_spin.setValue(15)
         self._topn_label = QLabel(t("reverse.topn_label"))
         adv_form.addRow(self._topn_label, self.topn_spin)
 
@@ -431,6 +431,7 @@ class ReverseTab(QWidget):
             t("reverse.summary_max") + f"<b>{rd['max_score']:.4f}</b>",
             t("reverse.summary_tied").format(rd['tied_count']),
             t("reverse.summary_returned").format(len(rd['results'])),
+            t("reverse.summary_topn").format(len(rd['results'])),
         ]
         if tiebreak:
             summary_parts.append(t("reverse.summary_noise"))

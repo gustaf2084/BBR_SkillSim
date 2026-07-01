@@ -5,7 +5,7 @@ Skill tree group matrix visualization — with probability halo signature elemen
 """
 
 from PySide6.QtCore import (
-    Qt, QRectF, QPointF, QPropertyAnimation, QEasingCurve, QTimer,
+    Qt, QRectF, QPoint, QPointF, QPropertyAnimation, QEasingCurve, QTimer,
 )
 from PySide6.QtGui import (
     QColor, QBrush, QPen, QFont, QPainter, QPixmap, QPainterPath,
@@ -13,7 +13,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGraphicsView, QGraphicsScene,
     QGraphicsEllipseItem, QGraphicsItem, QGraphicsPixmapItem,
-    QToolTip, QLabel, QPushButton, QComboBox, QSizePolicy, QScrollArea,
+    QLabel, QPushButton, QComboBox, QSizePolicy, QScrollArea,
     QMenu, QFrame,
 )
 
@@ -47,6 +47,67 @@ def build_skill_tree_data(gd, results):
             "tiers": pt,
         })
     return trees
+
+
+def _compute_composition(gd, trees, bg_id):
+    """Return set of group_ids for the most likely dice composition.
+
+    Simulates the game's roll logic deterministically:
+    - Includes guaranteed exclusive groups (by branch selection)
+    - For each non-exclusive category with N rolls, includes the top ceil(N)
+      groups by appearance probability
+    This mirrors what the game would actually roll in a single instance,
+    rather than showing every theoretically possible group.
+    """
+    bg = gd.backgrounds.get(bg_id, {})
+    composition = set()
+
+    # ── 1. Guaranteed exclusive groups ──
+    exc_cfg = bg.get("exclusive", {"mode": "none"})
+    guaranteed = set()
+    if exc_cfg.get("mode") == "fixed":
+        guaranteed.add(exc_cfg["group"])
+    elif exc_cfg.get("mode") == "prob":
+        picks = exc_cfg.get("picks", {})
+        if picks:
+            best = max(picks, key=picks.get)
+            guaranteed.add(best)
+    elif exc_cfg.get("mode") == "mixed":
+        for g in exc_cfg.get("forced", []):
+            guaranteed.add(g)
+        picks = exc_cfg.get("picks", {})
+        if picks:
+            best = max(picks, key=picks.get)
+            guaranteed.add(best)
+    composition.update(guaranteed)
+
+    # ── 2. Per-category top ceil(num_rolls) non-guaranteed groups ──
+    default_rolls = getattr(gd, "default_group_rolls", None)
+    if default_rolls is None:
+        return composition  # safety: if gd has no roll info, only show guaranteed
+
+    bg_rolls = bg.get("group_rolls", {})
+
+    for cat in ["Shared", "Exclusive", "Weapon", "Armor", "Fighting Style", "Special"]:
+        n = default_rolls.get(cat, 0) + bg_rolls.get(cat, 0)
+        if n <= 0:
+            continue
+        n_ceil = int(n + 0.999999)  # ceil, avoiding float precision issues
+
+        cat_groups = [(t["group_id"], t.get("probability", 0))
+                      for t in trees
+                      if gd.group_category(t["group_id"]) == cat
+                      and t["group_id"] not in guaranteed]
+        cat_groups.sort(key=lambda x: -x[1])
+        for g, _ in cat_groups[:n_ceil]:
+            composition.add(g)
+
+    # ── 3. Always include extremely high-probability groups (>90%) ──
+    for t in trees:
+        if t.get("probability", 0) >= 0.90:
+            composition.add(t["group_id"])
+
+    return composition
 
 # ── compact layout constants ─────────────────────────────────────
 NODE_RADIUS = 20
@@ -92,6 +153,7 @@ def prob_border_color(p):
 
 class SkillNode(QGraphicsEllipseItem):
     """Skill node: circle + perk icon + probability halo."""
+    _current_tooltip = None
 
     def __init__(self, group_id, tier_label, skill_name, skill_desc,
                  probability, icon_provider=None, highlighted=False, lang="zh"):
@@ -168,7 +230,8 @@ class SkillNode(QGraphicsEllipseItem):
     def _tooltip_text(self):
         if not self.skill_name:
             return ""
-        if self._lang == "en":
+        lang = self._lang  # 'zh' or 'en'
+        if lang == "en":
             name = self.skill_name
             desc = (self.skill_desc or "").strip()
             lines = [name]
@@ -198,19 +261,116 @@ class SkillNode(QGraphicsEllipseItem):
     def hoverEnterEvent(self, event):
         if self.skill_name:
             self.setPen(QPen(QColor("#FFFFFF"), 2.5))
-            QToolTip.showText(event.screenPos(), self._tooltip_text())
+            self._show_tooltip(event.screenPos())
         super().hoverEnterEvent(event)
 
     def hoverLeaveEvent(self, event):
-        QToolTip.hideText()
+        self._hide_tooltip()
         self._apply_style()
         super().hoverLeaveEvent(event)
 
     def hoverMoveEvent(self, event):
-        if self.skill_name:
-            QToolTip.showText(event.screenPos(), self._tooltip_text())
+        if SkillNode._current_tooltip and SkillNode._current_tooltip.isVisible():
+            sp = event.screenPos()
+            SkillNode._current_tooltip.move(int(sp.x()) + 20, int(sp.y()) + 15)
         super().hoverMoveEvent(event)
 
+    def _show_tooltip(self, screen_pos):
+        """Show a persistent custom tooltip at the given screen position."""
+        # Hide any existing tooltip first
+        SkillNode._hide_tooltip()
+        tw = QLabel()
+        tw.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint)
+        tw.setAttribute(Qt.WA_ShowWithoutActivating)
+        tw.setStyleSheet(
+            "background: #FFFFF0; border: 2px solid #B8860B; "
+            "border-radius: 6px; padding: 10px 12px; "
+            "font-size: 12px; line-height: 1.6; color: #1C1814;")
+        tw.setWordWrap(True)
+        tw.setMaximumWidth(420)
+        tw.setText(self._tooltip_text())
+        tw.adjustSize()
+        tw.move(int(screen_pos.x()) + 20, int(screen_pos.y()) + 15)
+        tw.show()
+        SkillNode._current_tooltip = tw
+
+    @staticmethod
+    def _hide_tooltip():
+        """Hide and destroy the current tooltip if any."""
+        if SkillNode._current_tooltip:
+            SkillNode._current_tooltip.hide()
+            SkillNode._current_tooltip.deleteLater()
+            SkillNode._current_tooltip = None
+
+class ColumnHeaderOverlay(QWidget):
+    """Overlay widget for column headers above the QGraphicsView viewport.
+
+    Drawn as a child of SkillTreeView, positioned above viewport margins.
+    Uses standard widget painting — avoids drawForeground coordinate pitfalls
+    introduced by Qt6's exposed-rect clipping in drawForeground.
+    """
+
+    def __init__(self, view, parent=None):
+        super().__init__(parent or view)
+        self._view = view
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.setFixedHeight(COL_HEADER_H)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, False)
+        w = self.width()
+
+        # ── column header background bar ──
+        painter.fillRect(QRectF(0, 0, w, COL_HEADER_H), QColor("#F2F0E8"))
+        painter.setPen(QPen(QColor("#D0CCC0"), 1))
+        painter.drawLine(QPointF(0, COL_HEADER_H - 1), QPointF(w, COL_HEADER_H - 1))
+
+        # ── top-left corner patch (row header area) ──
+        painter.fillRect(QRectF(0, 0, ROW_HEADER_W, COL_HEADER_H), QColor("#E8E4D8"))
+
+        headers = self._view._col_headers
+        if not headers:
+            painter.end()
+            return
+
+        highlight_col = self._view._highlight_col
+        flash_count = self._view._flash_count
+
+        painter.setFont(self._view._hdr_font)
+
+        for col, (label, prob) in enumerate(headers):
+            # scene → viewport via transform (float-precise, avoids
+            # mapFromScene int truncation), then + viewport.x() → overlay coords.
+            t = self._view.viewportTransform()
+            scene_x = float(MATRIX_LEFT + col * CELL_W)
+            vp_x = t.m11() * scene_x + t.m31()
+            x = int(self._view.viewport().x() + vp_x)
+
+            # Cull if entirely off-screen
+            if x + CELL_W < -CELL_W or x > w + CELL_W:
+                continue
+
+            # highlighted column background
+            if col == highlight_col:
+                alpha = 40 if flash_count % 2 == 0 else 10
+                painter.fillRect(
+                    QRectF(x, 0, CELL_W, COL_HEADER_H),
+                    QColor(184, 134, 11, alpha))
+
+            # probability color block
+            pc = prob_fill_color(prob)
+            painter.fillRect(QRectF(x + 4, COL_HEADER_H - 10, 5, 6), pc)
+            painter.setPen(QPen(pc.darker(130), 1))
+            painter.drawRect(QRectF(x + 4, COL_HEADER_H - 10, 5, 6))
+
+            # column name
+            text_color = QColor("#B8860B") if col == highlight_col else QColor("#333")
+            painter.setPen(text_color)
+            painter.drawText(QRectF(x + 12, 2, CELL_W - 16, COL_HEADER_H - 8),
+                           Qt.AlignLeft | Qt.AlignVCenter, label)
+
+        painter.end()
 
 class SkillTreeView(QGraphicsView):
     """QGraphicsView with sticky row/column headers."""
@@ -225,8 +385,11 @@ class SkillTreeView(QGraphicsView):
         self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
         self.setFrameShape(QGraphicsView.NoFrame)
         self.setBackgroundBrush(QColor("#FAFAF6"))
+
+        # Reserve top margin for the column header overlay
+        self.setViewportMargins(0, COL_HEADER_H, 0, 0)
+
         self._col_headers = []
-        self._h_scroll = 0
         self._hdr_font = QFont("Microsoft YaHei", 9)
         self._hdr_font.setBold(True)
         self._tier_font = QFont("Microsoft YaHei", 9)
@@ -237,8 +400,22 @@ class SkillTreeView(QGraphicsView):
         self._tier_labels = _tier_labels("zh")
         self.horizontalScrollBar().valueChanged.connect(self._on_h_scroll)
 
+        # Column header overlay — sits above viewport, draws headers with
+        # standard QWidget paintEvent (no drawForeground clipping issues).
+        self._header_overlay = ColumnHeaderOverlay(self, self)
+        self._header_overlay.setGeometry(0, 0, self.width(), COL_HEADER_H)
+
+    def resizeEvent(self, event):
+        """Keep column header overlay sized to the full view width."""
+        super().resizeEvent(event)
+        if hasattr(self, '_header_overlay'):
+            self._header_overlay.setGeometry(0, 0, self.width(), COL_HEADER_H)
+
     def set_col_headers(self, headers):
         self._col_headers = headers
+        self.viewport().update()
+        if hasattr(self, '_header_overlay'):
+            self._header_overlay.update()
 
     def set_tier_labels(self, labels):
         self._tier_labels = labels
@@ -249,6 +426,8 @@ class SkillTreeView(QGraphicsView):
         self._flash_count = 0
         self._flash_timer.start(150)
         self.viewport().update()
+        if hasattr(self, '_header_overlay'):
+            self._header_overlay.update()
 
     def _on_flash_tick(self):
         self._flash_count += 1
@@ -256,9 +435,12 @@ class SkillTreeView(QGraphicsView):
             self._flash_timer.stop()
             self._highlight_col = -1
         self.viewport().update()
+        if hasattr(self, '_header_overlay'):
+            self._header_overlay.update()
 
     def _on_h_scroll(self, value):
-        self._h_scroll = value
+        if hasattr(self, '_header_overlay'):
+            self._header_overlay.update()
         self.viewport().update()
 
     def drawBackground(self, painter, rect):
@@ -278,15 +460,18 @@ class SkillTreeView(QGraphicsView):
             painter.drawLine(MATRIX_LEFT, y, total_w, y)
 
     def drawForeground(self, painter, rect):
+        """Draw row header labels. Column headers are handled by ColumnHeaderOverlay."""
         super().drawForeground(painter, rect)
+        # With viewportMargins, the viewport starts below the overlay at y=0
         vp = self.viewport().rect()
         painter.setRenderHint(QPainter.Antialiasing, False)
 
-        # row header background
+        # row header background (viewport height)
         painter.fillRect(QRectF(0, 0, ROW_HEADER_W, vp.height()), QColor("#F2F0E8"))
         painter.setPen(QPen(QColor("#D0CCC0"), 1))
         painter.drawLine(QPointF(ROW_HEADER_W, 0), QPointF(ROW_HEADER_W, vp.height()))
 
+        # tier row labels
         painter.setFont(self._tier_font)
         labels = self._tier_labels
         for row in range(7):
@@ -294,41 +479,6 @@ class SkillTreeView(QGraphicsView):
             painter.setPen(QColor("#6B6359"))
             painter.drawText(QRectF(0, y, ROW_HEADER_W, CELL_H),
                            Qt.AlignCenter, labels[row] if row < len(labels) else f"T{row+1}")
-
-        # column header background
-        painter.fillRect(QRectF(0, 0, vp.width(), COL_HEADER_H), QColor("#F2F0E8"))
-        painter.setPen(QPen(QColor("#D0CCC0"), 1))
-        painter.drawLine(QPointF(0, COL_HEADER_H - 1), QPointF(vp.width(), COL_HEADER_H - 1))
-
-        if not self._col_headers:
-            return
-
-        painter.setFont(self._hdr_font)
-        for col, (label, prob) in enumerate(self._col_headers):
-            x = MATRIX_LEFT + col * CELL_W - self._h_scroll
-            if x + CELL_W < ROW_HEADER_W or x > vp.width():
-                continue
-
-            # highlighted column background
-            if col == self._highlight_col:
-                highlight_alpha = 40 if self._flash_count % 2 == 0 else 10
-                painter.fillRect(
-                    QRectF(x, 0, CELL_W, vp.height()),
-                    QColor(184, 134, 11, highlight_alpha))
-
-            # probability color block
-            pc = prob_fill_color(prob)
-            painter.fillRect(QRectF(x + 4, COL_HEADER_H - 10, 5, 6), pc)
-            painter.setPen(QPen(pc.darker(130), 1))
-            painter.drawRect(QRectF(x + 4, COL_HEADER_H - 10, 5, 6))
-
-            # column name
-            text_color = QColor("#B8860B") if col == self._highlight_col else QColor("#333")
-            painter.setPen(text_color)
-            painter.drawText(QRectF(x + 12, 2, CELL_W - 16, COL_HEADER_H - 8),
-                           Qt.AlignLeft | Qt.AlignVCenter, label)
-
-        painter.fillRect(QRectF(0, 0, ROW_HEADER_W, COL_HEADER_H), QColor("#E8E4D8"))
 
 
 class SkillTreeWidget(QWidget):
@@ -410,11 +560,25 @@ class SkillTreeWidget(QWidget):
         self._view.set_tier_labels(_tier_labels(lang))
         self._rebuild()
 
-    def set_trees(self, trees):
+    def set_trees(self, trees, bg_id=None, gd=None):
         self._all_trees = [t for t in trees if t.get("probability", 0) > 0]
         self._all_trees.sort(key=lambda t: t.get("probability", 0), reverse=True)
-        default_n = min(DEFAULT_MAX_GROUPS, len(self._all_trees))
-        self._active_ids = {t["group_id"] for t in self._all_trees[:default_n]}
+        # v0.2.0: show the "actual dice composition" — for each category
+        # with N rolls, activate only the top ceil(N) groups by probability,
+        # plus guaranteed exclusives.  Users can still add/remove groups
+        # manually via the chip bar.
+        if bg_id and gd:
+            composition = _compute_composition(gd, self._all_trees, bg_id)
+            self._active_ids = {t["group_id"] for t in self._all_trees
+                                if t["group_id"] in composition}
+            # safety: if composition is empty (bug / incomplete data),
+            # fall back to showing all groups
+            if not self._active_ids and self._all_trees:
+                self._active_ids = {t["group_id"] for t in self._all_trees}
+        else:
+            # backward-compatible fallback: show top 5
+            default_n = min(DEFAULT_MAX_GROUPS, len(self._all_trees))
+            self._active_ids = {t["group_id"] for t in self._all_trees[:default_n]}
         self._refresh()
 
     def clear(self):
@@ -478,6 +642,7 @@ class SkillTreeWidget(QWidget):
         headers = [(t.get("group_name", t["group_id"]), t.get("probability", 0))
                    for t in active]
         self._view.set_col_headers(headers)
+        self._view.viewport().update()  # force repaint so drawForeground picks up new headers
         ncols = len(active)
         scene_w = max(MATRIX_LEFT + ncols * CELL_W + 20, 200)
         scene_h = MATRIX_TOP + 7 * CELL_H + 10
@@ -535,13 +700,13 @@ class SkillTreeWidget(QWidget):
     def _on_add_menu(self):
         """Show menu to add a group."""
         menu = QMenu(self)
-        for t in self._all_trees:
-            if t["group_id"] in self._active_ids:
+        for tree in self._all_trees:
+            if tree["group_id"] in self._active_ids:
                 continue
-            gname = t.get("group_name", t["group_id"])
-            pct = int(t.get("probability", 0) * 100)
+            gname = tree.get("group_name", tree["group_id"])
+            pct = int(tree.get("probability", 0) * 100)
             action = menu.addAction(f"{gname}  ({pct}%)")
-            action.setData(t["group_id"])
+            action.setData(tree["group_id"])
         if menu.isEmpty():
             menu.addAction(t("st.all_shown")).setEnabled(False)
         chosen = menu.exec(self._add_btn.mapToGlobal(self._add_btn.rect().bottomLeft()))
@@ -558,4 +723,3 @@ class SkillTreeWidget(QWidget):
         anim.setEndValue(target_x)
         anim.setEasingCurve(QEasingCurve.OutCubic)
         anim.start()
-        # keep reference to animation to prevent garbage collection

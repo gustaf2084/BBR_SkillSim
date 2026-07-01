@@ -103,8 +103,9 @@ _add("reverse.need_target_body", "请至少选择一个目标技能树组。",
 _add("reverse.err_title",    "推导错误",               "Derivation Error")
 _add("reverse.err_prefix",   "推导过程出错：",          "An error occurred during derivation")
 _add("reverse.summary_max",  "最大概率/得分：",         "Max prob/score: ")
-_add("reverse.summary_tied", "并列组合：{0} 个",        "Tied combos: {0}")
-_add("reverse.summary_returned","返回：{0} 个",         "Returned: {0}")
+_add("reverse.summary_tied", "最高分并列：{0} 个",     "Peak-score ties: {0}")
+_add("reverse.summary_returned","返回：{0} 个（已去重）", "Returned: {0} (deduped)")
+_add("reverse.summary_topn", "按得分降序返回前 {0} 个",  "Top {0} by score (descending)")
 _add("reverse.summary_noise","（已按次要组干扰排序，干扰越小越纯粹）",
       "(sorted by side-group noise; lower is purer)")
 _add("reverse.purity_low_tip","非常纯粹，目标组是唯一高概率组",

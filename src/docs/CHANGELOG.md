@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.2.0 (2026-07-01)
+
+### 修复
+- 保证专属组概率显示为 0% 的 bug：`forward_simulate()` 和 `appear_prob_analytic()` 现直接使用 `resolve_exclusive()` 的保证概率（fixed=100%/prob=加权/mixed=forcedalways+picks加权），不再错误走 0.5× Exclusive 类别骰组逻辑
+- 受影响的 68 个背景（56 fixed + 10 prob + 2 mixed）：raider→Raider 100%、swordmaster→Soldier 100%、anatomist→Knave 30%/Trapper 70%、barbarian→Raider 62.5% 等
+- `_on_add_menu()` 当所有组已激活时崩溃（`'dict' object is not callable`）：循环变量 `t` 屏蔽了 i18n 翻译函数 `t()`，重命名为 `tree`
+- 技能树矩阵展示"实际骰组构成"而非全部可能组：新增 `_compute_composition()` 按类别骰数 ceil(N) 截取高概率组（例：raider 从 ~16 组缩减为 ~10 组），用户可手动添加其他组
+- 技能树 tooltip 中文模式下始终显示英文：`perk_zh._app_dir()` 未处理 `sys._MEIPASS`，PyInstaller 打包后无法找到 `perk_i18n.json`
+- tooltip 约 2 秒后自动消失：用自定义 `QLabel` 浮层（`Qt.ToolTip | Qt.FramelessWindowHint`）替代 `QToolTip.showText()`，鼠标离开前保持显示
+- 技能树矩阵列头偏移/缺失：Qt6 `drawForeground` 画笔裁剪与坐标映射不可靠，改用独立 `ColumnHeaderOverlay` QWidget 浮层（`paintEvent` + `setViewportMargins`）+ `viewportTransform()` 矩阵直接计算坐标（`t.m11()*scene_x + t.m31()` float 精度，避免 `mapFromScene` int 截断和 `mapTo` 控件层级问题）
+
+## v0.1.1 (2026-07-01)
+
+### 修复
+- 反向推导多目标时 NameError：`_finish_derive` 列表推导式变量名 `c` 应为 `cb`（触发条件：多目标且有结果时）
+
 ## v0.1.0 (2026-07-01)
 
 ### 新增
@@ -28,11 +44,6 @@
 - 代码规范：ruff + mypy + pytest 配置
 - 依赖管理：requirements.txt + requirements-dev.txt
 - 文档：README 用户指南 + FAQ + 开发者文档
-
-## v0.1.1 (2026-07-01)
-
-### 修复
-- 反向推导多目标时 NameError：`_finish_derive` 列表推导式变量名 `c` 应为 `cb`（触发条件：多目标且有结果时）
 
 ## v0.0.3 (2026-06-29)
 

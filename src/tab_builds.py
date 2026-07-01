@@ -583,4 +583,4 @@ class BuildsTab(QWidget):
         if trees is None:
             self.skill_tree.clear()
         else:
-            self.skill_tree.set_trees(trees)
+            self.skill_tree.set_trees(trees, bg_id=self._current_bg_id, gd=self.gd)

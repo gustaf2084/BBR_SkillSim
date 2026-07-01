@@ -409,7 +409,8 @@ class ForwardTab(QWidget):
         if trees is None:
             self.skill_tree.clear()
         else:
-            self.skill_tree.set_trees(trees)
+            bg_id = self.bg_combo.currentData()
+            self.skill_tree.set_trees(trees, bg_id=bg_id, gd=self.gd)
 
     def _on_table_click(self, item):
         row = item.row()

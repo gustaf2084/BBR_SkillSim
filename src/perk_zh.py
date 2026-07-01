@@ -11,7 +11,11 @@ import sys
 
 
 def _app_dir():
+    """Return the directory containing data files (supports PyInstaller frozen)."""
     if getattr(sys, "frozen", False):
+        # PyInstaller onefile: bundled data is extracted to sys._MEIPASS
+        if hasattr(sys, "_MEIPASS"):
+            return sys._MEIPASS
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
 

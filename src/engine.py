@@ -310,6 +310,28 @@ class SkillEngine:
             return results
         return [([], 1.0)]
 
+    def _get_guaranteed_exclusive_probs(self, bg_id: str) -> dict[str, float]:
+        """Return {group: guaranteed_prob} for groups guaranteed by exclusive config.
+
+        Covers fixed (100%), prob (weighted), and mixed (forced always 100% +
+        picks weighted) modes. Returns empty dict if background has no guaranteed
+        exclusive groups.
+
+        IMPORTANT: This "guaranteed" probability OVERRIDES (not adds to) the normal
+        "Exclusive category rolls 0.5 times" logic. In the mod, exclusive group
+        assignment is a separate guaranteed roll independent of the category-based
+        rolling system. The guaranteed probability equals the exclusive branch
+        probability directly — no 0.5× roll multiplier applies.
+        """
+        branches: list[tuple[list[str], float]] = self.resolve_exclusive(bg_id)
+        result: dict[str, float] = {}
+        for exc_groups, branch_p in branches:
+            if branch_p <= 0:
+                continue
+            for g in exc_groups:
+                result[g] = result.get(g, 0.0) + branch_p
+        return result
+
     # ------------------------------------------------------------------
     # 出现概率（解析近似）
     # ------------------------------------------------------------------
@@ -397,6 +419,15 @@ class SkillEngine:
         cat: str | None = gdef.get("category")
         if cat == "Always":  # General 恒出现
             return 1.0
+
+        # ── Guaranteed exclusive group: return guarantee probability directly ──
+        # The mod resolves exclusive groups via a separate guaranteed mechanism
+        # independent of the "Exclusive category 0.5× roll" system.
+        # Override the normal category-roll calculation for guaranteed groups.
+        if cat == "Exclusive":
+            guaranteed: dict[str, float] = self._get_guaranteed_exclusive_probs(bg_id)
+            if group in guaranteed:
+                return guaranteed[group]
 
         n: float = self.num_rolls(bg_id, cat)
         if n <= 0:
@@ -541,6 +572,13 @@ class SkillEngine:
 
         results: dict[str, float] = OrderedDict()
         any_available: bool = False
+
+        # Precompute guaranteed exclusive probabilities.
+        # These groups are assigned via a separate mechanism in the mod
+        # (independent of the "Exclusive category 0.5× roll" system),
+        # so their guaranteed probability OVERRIDES the normal category roll.
+        guaranteed_exclusive: dict[str, float] = self._get_guaranteed_exclusive_probs(bg_id)
+
         for group in self._all_groups:
             gdef: dict[str, Any] = gd.groups.get(group, {})
             cat: str | None = gdef.get("category")
@@ -548,7 +586,14 @@ class SkillEngine:
                 results[group] = 1.0
                 any_available = True
                 continue
-            if mode == "monte_carlo":
+            # ── Guaranteed exclusive group: use direct guarantee probability ──
+            # Covers fixed (100%), prob (weighted), and mixed modes.
+            # The mod resolves exclusive groups via a separate guaranteed mechanism
+            # independent of the "Exclusive category 0.5× roll" system.
+            # The guarantee probability OVERRIDES the normal category roll.
+            if cat == "Exclusive" and group in guaranteed_exclusive:
+                p = guaranteed_exclusive[group]
+            elif mode == "monte_carlo":
                 p: float = self.appear_prob_monte_carlo(
                     bg_id, trait_ids, group, samples=samples, seed=seed,
                     use_attribute=use_attribute, use_projected=use_projected)
@@ -649,8 +694,14 @@ class SkillEngine:
                     trait_combos.append(list(combo))
 
         # ── 两阶段剪枝 ──
+        # Ensure prune threshold is at least 2× top_n so the candidate pool
+        # is large enough to return top_n distinct backgrounds after dedup.
+        effective_prune: int = prune_threshold
+        if prune_threshold > 0 and top_n:
+            effective_prune = max(prune_threshold, top_n * 2, 20)
+
         candidate_bgs: list[str] = bgs
-        if prune_threshold > 0 and len(bgs) > prune_threshold:
+        if effective_prune > 0 and len(bgs) > effective_prune:
             # 阶段1: 仅无特性组合，筛选前 prune_threshold 个高分背景
             phase1_scores: list[tuple[str, float]] = []
             for bg_id in bgs:
@@ -670,13 +721,13 @@ class SkillEngine:
                 if score > 0:
                     phase1_scores.append((bg_id, score))
             phase1_scores.sort(key=lambda x: -x[1])
-            candidate_bgs = [bg_id for bg_id, _ in phase1_scores[:prune_threshold]]
+            candidate_bgs = [bg_id for bg_id, _ in phase1_scores[:effective_prune]]
             if not candidate_bgs:
                 return {"max_score": 0.0, "results": [], "tied_count": 0}
             # 阶段2: 仅对高分背景遍历特性组合
 
-        best_score: float = 0.0
-        best_results: list[tuple[str, tuple[str, ...], float, dict[str, float]]] = []
+        # ── Collect ALL results (not just max-score) ──
+        all_results: list[tuple[str, tuple[str, ...], float, dict[str, float]]] = []
 
         total_bgs: int = len(candidate_bgs)
         for bg_idx, bg_id in enumerate(candidate_bgs):
@@ -701,21 +752,40 @@ class SkillEngine:
                             use_projected=use_projected)
                     group_probs[g] = p
                     score += weights.get(g, 1.0) * p
-                if score > best_score + EPS:
-                    best_score = score
-                    best_results = [(bg_id, tuple(combo), score, group_probs)]
-                elif abs(score - best_score) <= EPS and best_score > 0:
-                    best_results.append((bg_id, tuple(combo), score, group_probs))
+                if score > 0:
+                    all_results.append((bg_id, tuple(combo), score, group_probs))
 
-        tied_count: int = len(best_results)
-        if best_score <= 0 or not best_results:
+        if not all_results:
             return {"max_score": 0.0, "results": [], "tied_count": 0}
+
+        # ── Dedup: for each bg_id, keep only the highest-scoring row ──
+        # When multi_trait is enabled, the same background may appear with
+        # multiple trait combos; keep only the best-scoring one.
+        # If same score, prefer lexicographically smaller trait combo.
+        deduped: dict[str, tuple[str, tuple[str, ...], float, dict[str, float]]] = {}
+        for bg_id, combo, score, group_probs in all_results:
+            if bg_id not in deduped or score > deduped[bg_id][2] + EPS:
+                deduped[bg_id] = (bg_id, combo, score, group_probs)
+            elif abs(score - deduped[bg_id][2]) <= EPS:
+                existing_combo: tuple[str, ...] = deduped[bg_id][1]
+                if list(combo) < list(existing_combo):
+                    deduped[bg_id] = (bg_id, combo, score, group_probs)
+
+        # ── Sort by score descending ──
+        deduped_list: list[tuple[str, tuple[str, ...], float, dict[str, float]]] = sorted(
+            deduped.values(), key=lambda x: -x[2])
+
+        best_score: float = deduped_list[0][2] if deduped_list else 0.0
+
+        # ── tied_count: how many rows tie with the max score (for summary) ──
+        tied_count: int = sum(
+            1 for _, _, s, _ in deduped_list if abs(s - best_score) <= EPS)
 
         # 并列过多时，计算"次要组干扰分"(purity) 用于次级排序
         # purity = 该组合下非目标组的出现概率总和（越小越纯粹，越靠前）
-        use_tiebreak: bool = tied_count > tiebreak_limit
+        use_tiebreak: bool = len(deduped_list) > tiebreak_limit
         scored: list[tuple[str, tuple[str, ...], float, dict[str, float], float]] = []
-        for bg_id, combo, score, group_probs in best_results:
+        for bg_id, combo, score, group_probs in deduped_list:
             purity: float = 0.0
             if use_tiebreak:
                 # 计算非目标组的总出现概率
@@ -736,8 +806,8 @@ class SkillEngine:
                     purity += p
             scored.append((bg_id, combo, score, group_probs, purity))
 
-        # 排序：背景名升序、特性名升序、干扰分升序（purity 小=更纯粹=更靠前）
-        scored.sort(key=lambda x: (x[0], list(x[1]), x[4]))
+        # 排序：得分降序，同分时干扰分升序（purity 小=更纯粹=更靠前）
+        scored.sort(key=lambda x: (-x[2], x[4]))
         if top_n is not None:
             scored = scored[:top_n]
         return {
