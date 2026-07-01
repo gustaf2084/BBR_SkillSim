@@ -20,6 +20,34 @@ from PySide6.QtWidgets import (
 from perk_zh import get_perk_name_zh, get_perk_desc_zh
 from i18n import t
 
+# ── shared utility ─────────────────────────────────────────────────
+def build_skill_tree_data(gd, results):
+    """将正向模拟结果转换为 SkillTreeWidget.set_trees() 所需的数据格式。
+
+    Args:
+        gd: GameData 实例
+        results: OrderedDict {group_id: probability} 或 None
+
+    Returns:
+        list[dict] 或 None（当 results 为 None 时）
+    """
+    if results is None:
+        return None
+    trees = []
+    for group, prob in results.items():
+        if prob <= 0:
+            continue
+        if gd.group_category(group) == "Always":
+            continue
+        pt = gd.get_perk_tree(group)
+        trees.append({
+            "group_id": group,
+            "group_name": gd.group_name(group),
+            "probability": prob,
+            "tiers": pt,
+        })
+    return trees
+
 # ── compact layout constants ─────────────────────────────────────
 NODE_RADIUS = 20
 NODE_DIAM = NODE_RADIUS * 2

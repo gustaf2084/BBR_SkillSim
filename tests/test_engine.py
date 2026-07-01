@@ -1,0 +1,361 @@
+# -*- coding: utf-8 -*-
+"""Unit tests for engine.py - SkillEngine probability calculations."""
+
+import sys
+import os
+import math
+import pytest
+
+_src = os.path.join(os.path.dirname(__file__), "..", "src")
+sys.path.insert(0, os.path.abspath(_src))
+
+from engine import SkillEngine, RANGED_GROUPS, CATEGORY_ORDER
+from data_loader import load_data, GameData
+
+
+@pytest.fixture(scope="module")
+def gd():
+    data_path = os.path.join(os.path.abspath(_src), "data.json")
+    return load_data(data_path, strict_version=False, lang="zh")
+
+
+@pytest.fixture(scope="module")
+def engine(gd):
+    return SkillEngine(gd)
+
+
+class TestForwardSimulate:
+    def test_returns_ordereddict(self, engine):
+        result = engine.forward_simulate("assassin_background", [], mode="analytic")
+        assert result is not None
+        assert list(result.keys())
+
+    def test_dagger_high_for_assassin(self, engine):
+        result = engine.forward_simulate("assassin_background", [], mode="analytic")
+        assert result is not None
+        assert result.get("Dagger", 0) > 0.99
+
+    def test_light_armor_high_for_assassin(self, engine):
+        result = engine.forward_simulate("assassin_background", [], mode="analytic")
+        assert result is not None
+        assert result.get("Light Armor", 0) > 0.99
+
+    def test_always_groups_have_prob_1(self, engine):
+        result = engine.forward_simulate("assassin_background", [], mode="analytic")
+        assert result is not None
+        assert result.get("General", 0) == 1.0
+
+    def test_probabilities_in_01_range(self, engine):
+        result = engine.forward_simulate("assassin_background", [], mode="analytic")
+        assert result is not None
+        for group, prob in result.items():
+            assert 0.0 <= prob <= 1.0, f"{group}: {prob} out of range"
+
+    def test_assassin_exclusive_resolves(self, engine):
+        branches = engine.resolve_exclusive("assassin_background")
+        assert len(branches) == 1
+        groups, prob = branches[0]
+        assert groups == ["Knave"]
+        assert prob == 1.0
+
+    def test_noble_exclusive_resolves(self, engine):
+        branches = engine.resolve_exclusive("adventurous_noble_background")
+        assert len(branches) == 1
+        groups, prob = branches[0]
+        assert groups == ["Noble"]
+        assert prob == 1.0
+
+    def test_invalid_bg_id_returns_none(self, engine):
+        result = engine.forward_simulate("nonexistent_background", [], mode="analytic")
+        assert result is None
+
+    def test_empty_traits_works(self, engine):
+        result = engine.forward_simulate("squire_background", [], mode="analytic")
+        assert result is not None
+
+    def test_with_traits(self, engine):
+        result = engine.forward_simulate("assassin_background", ["Athletic"], mode="analytic")
+        assert result is not None
+        assert 0.0 <= result.get("Agile", 0) <= 1.0
+
+    def test_ordering_desc_by_prob(self, engine):
+        result = engine.forward_simulate("assassin_background", [], mode="analytic")
+        assert result is not None
+        items = list(result.items())
+        for i in range(len(items) - 1):
+            g1, p1 = items[i]
+            g2, p2 = items[i + 1]
+            if p1 < p2:
+                pytest.fail(f"Order violation at {i}: {g1}={p1} < {g2}={p2}")
+            elif p1 == p2:
+                assert g1 <= g2, f"Tiebreak violation: {g1} > {g2}"
+
+    def test_squire_not_none(self, engine):
+        result = engine.forward_simulate("squire_background", [], mode="analytic")
+        assert result is not None
+
+    def test_anatomist_background(self, engine):
+        result = engine.forward_simulate("anatomist_background", [], mode="analytic")
+        assert result is not None
+
+    def test_monte_carlo_produces_results(self, engine):
+        result = engine.forward_simulate("assassin_background", [], mode="monte_carlo",
+                                          samples=5000, seed=42)
+        assert result is not None
+        assert result.get("Dagger", 0) > 0.99
+
+
+class TestAnalyticVsMonteCarlo:
+    TOLERANCE = 0.05
+    TEST_GROUPS = ["Dagger", "Light Armor", "Swift", "Agile", "Fast", "Heavy Armor"]
+    BACKGROUND = "assassin_background"
+
+    def test_consistency_assassin(self, engine):
+        diffs = []
+        for group in self.TEST_GROUPS:
+            pa = engine.appear_prob_analytic(self.BACKGROUND, [], group)
+            pm = engine.appear_prob_monte_carlo(self.BACKGROUND, [], group,
+                                                 samples=30000, seed=42)
+            diff = abs(pa - pm)
+            diffs.append((group, pa, pm, diff))
+        worst = max(diffs, key=lambda x: x[3])
+        assert worst[3] < self.TOLERANCE, (
+            f"Worst diff: {worst[0]} analytic={worst[1]:.3f} monte={worst[2]:.3f} "
+            f"diff={worst[3]:.3f} >= {self.TOLERANCE}")
+
+    def test_consistency_squire(self, engine):
+        import copy
+        eng2 = SkillEngine(engine.gd)
+        groups = ["Sword", "Shield"]
+        diffs = []
+        for group in groups:
+            pa = eng2.appear_prob_analytic("squire_background", [], group)
+            pm = eng2.appear_prob_monte_carlo("squire_background", [], group,
+                                               samples=20000, seed=42)
+            diffs.append(abs(pa - pm))
+        worst = max(diffs)
+        assert worst < self.TOLERANCE, f"Worst diff for squire: {worst:.3f}"
+
+    def test_consistency_vs_pruned_weights_zero(self, engine):
+        pa = engine.appear_prob_analytic("assassin_background", [], "Heavy Armor")
+        pm = engine.appear_prob_monte_carlo("assassin_background", [], "Heavy Armor",
+                                             samples=10000, seed=42)
+        assert pa == 0.0
+        assert pm == 0.0
+
+
+class TestEdgeCases:
+    def test_empty_traits_no_forward(self, engine):
+        result = engine.forward_simulate("assassin_background", [], mode="analytic")
+        assert result is not None
+
+    def test_invalid_bg_id_forward(self, engine):
+        result = engine.forward_simulate("", [], mode="analytic")
+        assert result is None
+
+    def test_invalid_bg_id_appear_prob(self, engine):
+        p = engine.appear_prob_analytic("no_such_bg", [], "Dagger")
+        assert p == 0.0
+
+    def test_invalid_group_appear_prob(self, engine):
+        p = engine.appear_prob_analytic("assassin_background", [], "NoSuchGroup")
+        assert p == 0.0
+
+    def test_melee_only_blocks_ranged(self, engine):
+        result = engine.forward_simulate("assassin_background", [], mode="analytic")
+        assert result is not None
+        for rg in RANGED_GROUPS:
+            if rg in result:
+                assert result[rg] == 0.0, f"{rg} should be 0 for melee_only"
+
+    def test_adventurous_noble_is_melee_only(self, engine):
+        result = engine.forward_simulate("adventurous_noble_background", [], mode="analytic")
+        assert result is not None
+        for rg in RANGED_GROUPS:
+            if rg in result:
+                assert result[rg] == 0.0, f"{rg} prob={result[rg]} for melee_only bg"
+
+
+class TestCaching:
+    def test_cache_returns_same_object(self, engine):
+        r1 = engine.forward_simulate("assassin_background", [], mode="analytic")
+        r2 = engine.forward_simulate("assassin_background", [], mode="analytic")
+        assert r1 is r2, "Second call did not return cached object"
+
+    def test_cache_different_traits_different_result(self, engine):
+        r1 = engine.forward_simulate("assassin_background", [], mode="analytic")
+        r2 = engine.forward_simulate("assassin_background", ["Clubfooted"], mode="analytic")
+        assert r1 is not None and r2 is not None
+        assert r1 is not r2, "Different traits should produce different cached objects"
+        assert r2.get("Agile", 0) == 0.0, "Clubfooted should zero Agile"
+        assert r1.get("Agile", 0) > 0.0, "Without Clubfooted, Agile should be >0"
+
+    def test_cache_with_lru_eviction(self, engine):
+        bgs = list(engine.gd.complete_backgrounds())
+        for bg_id in bgs[:5]:
+            engine.forward_simulate(bg_id, [], mode="analytic")
+
+    def test_cache_none_result(self, engine):
+        r1 = engine.forward_simulate("no_such_bg", [], mode="analytic")
+        assert r1 is None
+
+
+class TestReverseDerive:
+    def test_reverse_derive_dagger(self, engine):
+        result = engine.reverse_derive(
+            ["Dagger"], mode="analytic", top_n=5, tiebreak_limit=20,
+            prune_threshold=20)
+        assert result["max_score"] > 0
+        assert len(result["results"]) > 0
+        first = result["results"][0]
+        assert len(first) == 5
+        assert first[2] > 0
+
+    def test_reverse_derive_pruning_disabled(self, engine):
+        result = engine.reverse_derive(
+            ["Dagger"], mode="analytic", top_n=5, tiebreak_limit=20,
+            prune_threshold=0)
+        assert result["max_score"] > 0
+        assert len(result["results"]) > 0
+
+    def test_reverse_derive_preserves_max_score(self, engine):
+        r_prune = engine.reverse_derive(
+            ["Dagger"], mode="analytic", top_n=5, tiebreak_limit=20,
+            prune_threshold=20)
+        r_no_prune = engine.reverse_derive(
+            ["Dagger"], mode="analytic", top_n=5, tiebreak_limit=20,
+            prune_threshold=0)
+        assert r_prune["max_score"] > 0
+        assert r_no_prune["max_score"] > 0
+        diff = abs(r_prune["max_score"] - r_no_prune["max_score"])
+        assert diff < 0.01
+
+    def test_reverse_derive_invalid_target(self, engine):
+        result = engine.reverse_derive(
+            ["NoSuchGroup"], mode="analytic", top_n=5, tiebreak_limit=20,
+            prune_threshold=20)
+        assert result["max_score"] == 0.0
+        assert len(result["results"]) == 0
+
+    def test_reverse_derive_invalid_mixed_targets(self, engine):
+        result = engine.reverse_derive(
+            ["Dagger", "NoSuchGroup"], mode="analytic", top_n=5,
+            tiebreak_limit=20, prune_threshold=20)
+        assert result["max_score"] >= 0
+        assert isinstance(result["results"], list)
+
+    def test_reverse_derive_multi_target(self, engine):
+        result = engine.reverse_derive(
+            ["Heavy Armor", "Shield", "Trained"], mode="analytic",
+            top_n=3, tiebreak_limit=20, prune_threshold=20)
+        assert result["max_score"] > 0
+        assert len(result["results"]) > 0
+
+    def test_reverse_derive_with_custom_weights(self, engine):
+        result = engine.reverse_derive(
+            ["Dagger", "Light Armor"],
+            weights={"Dagger": 2.0, "Light Armor": 1.0},
+            mode="analytic", top_n=5, tiebreak_limit=20,
+            prune_threshold=20)
+        assert result["max_score"] > 0
+
+    def test_reverse_derive_no_results_for_impossible(self, engine):
+        result = engine.reverse_derive(
+            [], mode="analytic", top_n=5, tiebreak_limit=20,
+            prune_threshold=20)
+        assert result["max_score"] == 0.0
+
+
+class TestProgressCallback:
+    def test_callback_fires(self, engine):
+        call_count = [0]
+        def callback(current, total):
+            call_count[0] += 1
+            return False
+        result = engine.reverse_derive(
+            ["Dagger"], mode="analytic", top_n=3, tiebreak_limit=20,
+            prune_threshold=20,
+            progress_callback=callback)
+        assert call_count[0] >= 1, f"Callback called {call_count[0]} times"
+
+    def test_callback_total_is_positive(self, engine):
+        totals = []
+        def callback(current, total):
+            totals.append(total)
+            return False
+        engine.reverse_derive(
+            ["Dagger"], mode="analytic", top_n=3, tiebreak_limit=20,
+            prune_threshold=20,
+            progress_callback=callback)
+        assert len(totals) >= 1
+        assert all(t > 0 for t in totals)
+
+    def test_callback_cancel(self, engine):
+        def callback(current, total):
+            return True
+        result = engine.reverse_derive(
+            ["Dagger"], mode="analytic", top_n=3, tiebreak_limit=20,
+            prune_threshold=20,
+            progress_callback=callback)
+        assert result.get("cancelled") is True
+
+
+class TestExclusiveGroups:
+    def test_assassin_exclusive_fixed_knave(self, engine):
+        branches = engine.resolve_exclusive("assassin_background")
+        assert len(branches) == 1
+        groups, prob = branches[0]
+        assert groups == ["Knave"]
+        assert prob == 1.0
+
+    def test_adventurous_noble_exclusive_fixed_noble(self, engine):
+        branches = engine.resolve_exclusive("adventurous_noble_background")
+        assert len(branches) == 1
+        groups, prob = branches[0]
+        assert groups == ["Noble"]
+        assert prob == 1.0
+
+    def test_exclusive_cascade_weights_exist(self, engine):
+        weights = engine.exclusive_cascade_weights("Knave")
+        assert isinstance(weights, dict)
+
+    def test_nonexclusive_background_has_none_mode(self, engine):
+        branches = engine.resolve_exclusive("apprentice_background")
+        assert len(branches) == 1
+        groups, prob = branches[0]
+        assert groups == []
+        assert prob == 1.0
+
+
+class TestMeleeOnly:
+    MELEE_ONLY_BGS = ["assassin_background", "adventurous_noble_background"]
+
+    def test_melee_only_zero_ranged_weights(self, engine):
+        for bg_id in self.MELEE_ONLY_BGS:
+            if bg_id in engine.gd.complete_backgrounds():
+                for rg in RANGED_GROUPS:
+                    w = engine.compute_raw_weight(bg_id, [], rg)
+                    assert w == 0.0, f"{bg_id} {rg} weight={w}, expected 0"
+
+    def test_non_melee_background_has_ranged_weights(self, engine):
+        w = engine.compute_raw_weight("squire_background", [], "Bow")
+        assert w >= 0
+
+    def test_melee_only_does_not_affect_non_ranged(self, engine):
+        for bg_id in self.MELEE_ONLY_BGS:
+            if bg_id in engine.gd.complete_backgrounds():
+                w = engine.compute_raw_weight(bg_id, [], "Axe")
+                assert w > 0, f"{bg_id} Axe weight={w}, expected > 0"
+
+
+class TestGroupRollMechanics:
+    def test_default_rolls_non_negative(self, engine):
+        for cat, n in engine.default_rolls.items():
+            assert n >= 0, f"{cat} default_rolls={n}"
+
+    def test_exclusive_half_roll(self, engine):
+        assert engine.default_rolls.get("Exclusive", 0) == 0.5
+
+    def test_num_rolls_with_modifier(self, engine):
+        n = engine.num_rolls("assassin_background", "Weapon")
+        assert n == pytest.approx(5.0), f"Expected 5 (3 base + 2), got {n}"

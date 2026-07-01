@@ -31,9 +31,12 @@ engine.py
     cascade_weights_for_exclusive(...) -> {group: weight}
 """
 
+from __future__ import annotations
+
 import random
-from collections import OrderedDict, defaultdict
-from copy import deepcopy
+from collections import OrderedDict
+from collections.abc import Callable
+from typing import Any
 
 from data_loader import GameData
 
@@ -69,74 +72,99 @@ DEFAULT_PROJECTED = {
 # 引擎
 # ---------------------------------------------------------------------------
 
+# Type aliases for readability
+GroupId = str
+BgId = str
+TraitId = str
+WeightDict = dict[str, float]
+Background = dict[str, Any]
+Trait = dict[str, Any]
+GroupDef = dict[str, Any]
+ReverseResultItem = tuple[str, tuple[str, ...], float, dict[str, float], float]
+ReverseResult = dict[str, Any]
+
+
 class SkillEngine:
     """技能树出现概率计算引擎。"""
 
-    def __init__(self, game_data):
+    gd: GameData
+    big_weight: float
+    default_rolls: dict[str, float]
+    _groups_by_cat: dict[str, list[str]]
+    _all_groups: list[str]
+    _forward_cache: dict[tuple, OrderedDict | None]
+    _forward_cache_max: int
+    _norepl_cache: dict[str, dict[tuple[int, int], float]]
+
+    def __init__(self, game_data: GameData) -> None:
         """
         参数:
           game_data: GameData 实例（来自 data_loader.load_data）
         """
         self.gd = game_data
-        self.big_weight = game_data.big_weight
-        self.default_rolls = game_data.default_group_rolls
+        self.big_weight: float = game_data.big_weight
+        self.default_rolls: dict[str, float] = game_data.default_group_rolls
         # 预计算各类别组列表
-        self._groups_by_cat = {}
+        self._groups_by_cat: dict[str, list[str]] = {}
         for cat in CATEGORY_ORDER:
             self._groups_by_cat[cat] = game_data.groups_by_category(cat)
-        self._all_groups = list(game_data.groups.keys())
+        self._all_groups: list[str] = list(game_data.groups.keys())
+        # 缓存层
+        self._forward_cache: dict[tuple, OrderedDict | None] = {}     # key -> OrderedDict | None (analytic only)
+        self._forward_cache_max: int = 200
+        self._norepl_cache: dict[str, dict[tuple[int, int], float]] = {}      # target: {bitmask_state: result}  for _appear_prob_no_replacement
 
     # ------------------------------------------------------------------
     # 权重合成
     # ------------------------------------------------------------------
 
-    def exclusive_cascade_weights(self, exclusive_group_name):
+    def exclusive_cascade_weights(self, exclusive_group_name: str) -> dict[str, float]:
         """返回某专属组的级联权重修正 {group: weight}。"""
-        ec = self.gd.exclusive_groups.get(exclusive_group_name, {})
+        ec: dict[str, Any] = self.gd.exclusive_groups.get(exclusive_group_name, {})
         return dict(ec.get("other_weights", {}))
 
-    def attribute_star_weight(self, group, talent_stars=None):
+    def attribute_star_weight(self, group: str, talent_stars: dict[str, float] | None = None) -> float:
         """
         天赋星对组权重的修正。
         talent_stars: {attribute: stars} 或 None（用默认中值）。
         """
         if talent_stars is None:
             talent_stars = {a: DEFAULT_TALENT_STARS for a in self.gd.attribute_weights}
-        w = 0.0
+        w: float = 0.0
         for attr, stars in talent_stars.items():
-            attr_map = self.gd.attribute_weights.get(attr, {})
+            attr_map: dict[str, Any] = self.gd.attribute_weights.get(attr, {})
             if group in attr_map:
-                multiplier = attr_map[group]
+                multiplier: float = attr_map[group]
                 if multiplier > 0:
                     w += multiplier * stars
         return w
 
-    def projected_attr_weight(self, group, projected=None):
+    def projected_attr_weight(self, group: str, projected: dict[str, float] | None = None) -> float:
         """
         投影属性对组权重的修正。
         projected: {attribute: value} 或 None（用默认中值）。
         规则: 若投影值超过 cutoff，权重 += base * (value - cutoff) 的某种近似。
         简化为: base * max(0, (value - cutoff) / 10) 作为加成（保守估计）。
         """
-        proj = self.gd.projected_attributes.get(group)
+        proj: dict[str, Any] | None = self.gd.projected_attributes.get(group)
         if not proj:
             return 0.0
         if projected is None:
             projected = DEFAULT_PROJECTED
-        base = proj.get("base", 0.0)
-        cutoff = proj.get("cutoff")
+        base: float = proj.get("base", 0.0)
+        cutoff: float | None = proj.get("cutoff")
         if cutoff is None:
             # 无 cutoff 的组（如 Dagger/Shield 投影），用 base 作为基础权重
             return base
         # 找该组 governed by 的属性（按组名推断）
-        gov_attr = self._group_governing_attr(group)
-        val = projected.get(gov_attr, 0.0)
+        gov_attr: str = self._group_governing_attr(group)
+        val: float = projected.get(gov_attr, 0.0)
         if val > cutoff:
             # 每超过 cutoff 10 点加一个 base 的权重
             return base * max(0.0, (val - cutoff) / 10.0)
         return 0.0
 
-    def _group_governing_attr(self, group):
+    def _group_governing_attr(self, group: str) -> str:
         """根据组名推断投影属性受哪个属性管辖。"""
         # 武器组受 Melee Skill 管辖（远程武器受 Ranged Skill）
         if group in {"Bow", "Crossbow", "Throwing", "Ranged"}:
@@ -147,8 +175,10 @@ class SkillEngine:
             return "Initiative"
         return "Melee Skill"
 
-    def compute_raw_weight(self, bg_id, trait_ids, group,
-                           exclusive_active=None, use_attribute=True, use_projected=True):
+    def compute_raw_weight(self, bg_id: str, trait_ids: list[str], group: str,
+                           exclusive_active: list[str] | None = None,
+                           use_attribute: bool = True,
+                           use_projected: bool = True) -> float:
         """
         计算单个组的合成权重（未归一化）。
         exclusive_active: 当前已骰出的专属组名列表（用于级联）；None 表示不考虑级联。
@@ -221,12 +251,12 @@ class SkillEngine:
     # 骰组数量
     # ------------------------------------------------------------------
 
-    def num_rolls(self, bg_id, category):
+    def num_rolls(self, bg_id: str, category: str) -> float:
         """某类别骰组数 = 默认基线 + 背景修正，最小 0。"""
-        base = self.default_rolls.get(category, 0)
-        bg = self.gd.backgrounds.get(bg_id, {})
-        mod = bg.get("group_rolls", {}).get(category, 0)
-        n = base + mod
+        base: float = self.default_rolls.get(category, 0)
+        bg: dict[str, Any] = self.gd.backgrounds.get(bg_id, {})
+        mod: float = bg.get("group_rolls", {}).get(category, 0)
+        n: float = base + mod
         if isinstance(n, float):
             n = n  # Exclusive 基线 0.5 保留浮点
         return max(0.0, n)
@@ -235,7 +265,7 @@ class SkillEngine:
     # 专属组确定
     # ------------------------------------------------------------------
 
-    def resolve_exclusive(self, bg_id, rng=None):
+    def resolve_exclusive(self, bg_id: str, rng: random.Random | None = None) -> list[tuple[list[str], float]]:
         """
         根据背景的 exclusive 配置，返回可能的专属组结果列表（带概率）。
         返回: [(exclusive_groups_list, probability), ...]
@@ -244,28 +274,28 @@ class SkillEngine:
           - mixed: forced 组必出 + prob 分支
           - none:  [([], 1.0)]
         """
-        bg = self.gd.backgrounds.get(bg_id, {})
-        exc = bg.get("exclusive", {"mode": "none"})
-        mode = exc.get("mode", "none")
+        bg: dict[str, Any] = self.gd.backgrounds.get(bg_id, {})
+        exc: dict[str, Any] = bg.get("exclusive", {"mode": "none"})
+        mode: str = exc.get("mode", "none")
 
         if mode == "none":
             return [([], 1.0)]
         if mode == "fixed":
             return [([exc.get("group")], 1.0)]
         if mode == "prob":
-            picks = exc.get("picks", {})
-            none_chance = exc.get("none_chance", 0.0)
-            total = sum(picks.values()) + none_chance
+            picks: dict[str, float] = exc.get("picks", {})
+            none_chance: float = exc.get("none_chance", 0.0)
+            total: float = sum(picks.values()) + none_chance
             if total <= 0:
                 return [([], 1.0)]
-            results = []
+            results: list[tuple[list[str], float]] = []
             for g, p in picks.items():
                 results.append(([g], p / total))
             if none_chance > 0:
                 results.append(([], none_chance / total))
             return results
         if mode == "mixed":
-            forced = exc.get("forced", [])
+            forced: list[str] = exc.get("forced", [])
             picks = exc.get("picks", {})
             none_chance = exc.get("none_chance", 0.0)
             total = sum(picks.values()) + none_chance
@@ -284,7 +314,7 @@ class SkillEngine:
     # 出现概率（解析近似）
     # ------------------------------------------------------------------
 
-    def _appear_prob_no_replacement(self, weights_dict, target, n):
+    def _appear_prob_no_replacement(self, weights_dict: dict[str, float], target: str, n: float) -> float:
         """
         无放回抽样的解析近似：类别内骰 n 组，计算 target 至少被抽中一次的概率。
         weights_dict: {group: weight}（仅正权重组）
@@ -293,59 +323,61 @@ class SkillEngine:
           抽中非 target 组后，该组被移出，剩余权重重新归一。
           由于"抽中哪个非target组"会影响 target 后续权重占比，这里用按权重加权
           的期望更新（对 target 占比做一阶近似），在组数≤12、n≤5 时精度足够。
+        使用实例级缓存避免跨调用重复计算。
         """
         if target not in weights_dict or weights_dict[target] <= 0:
             return 0.0
-        n_eff = int(round(n))
+        n_eff: int = int(round(n))
         if n_eff <= 0:
             return 0.0
         if len(weights_dict) == 1:
             return 1.0 if target in weights_dict else 0.0
 
-        # 用状态：当前各组剩余权重。逐轮抽样，计算 target 至少被抽中一次。
-        # 为保持解析性且避免组合爆炸，采用"权重加权期望"近似：
-        #   每轮按当前权重抽一个组；若抽中 target，命中；否则移出该组，继续。
-        #   对"未抽中 target"的路径，按各非target组被抽中的概率加权后续状态。
-        # 用递归 + 记忆化（状态为 frozenset 剩余组）。
-        from functools import lru_cache
-
-        items = sorted(weights_dict.items(), key=lambda x: x[0])
-        names = [it[0] for it in items]
-        wts = [it[1] for it in items]
-        target_idx = names.index(target) if target in names else -1
+        # 构建缓存 key：组名列表 + target + n + 权重（避免不同背景的碰撞）
+        items: list[tuple[str, float]] = sorted(weights_dict.items(), key=lambda x: x[0])
+        names: list[str] = [it[0] for it in items]
+        wts: list[float] = [it[1] for it in items]
+        target_idx: int = names.index(target) if target in names else -1
         if target_idx < 0:
             return 0.0
 
-        # 记忆化：状态 = 剩余组的位掩码 + 已抽次数。返回 P(target 至少被抽中一次)
-        @lru_cache(maxsize=None)
-        def p_hit(mask, k):
+        # 实例级记忆化：缓存键包含权重签名以避免不同调用间的碰撞
+        cache_key: tuple = (target, tuple((n, round(w, 6)) for n, w in items), n_eff)
+        if cache_key in self._norepl_cache:
+            return self._norepl_cache[cache_key]
+
+        def p_hit(mask: int, k: int) -> float:
             if k <= 0:
                 return 0.0
-            # 当前剩余组的权重
-            idxs = [i for i in range(len(names)) if (mask >> i) & 1]
+            inner_key: tuple[int, int] = (mask, k)
+            # 子结果存储在全局缓存中带前缀
+            full_key: tuple = cache_key + (mask, k)
+            if full_key in self._norepl_cache:
+                return self._norepl_cache[full_key]
+            idxs: list[int] = [i for i in range(len(names)) if (mask >> i) & 1]
             if not idxs:
                 return 0.0
-            total = sum(wts[i] for i in idxs)
+            total: float = sum(wts[i] for i in idxs)
             if total <= 0:
                 return 0.0
-            # 本轮抽中 target 的概率
-            p_target = wts[target_idx] / total if (mask >> target_idx) & 1 else 0.0
-            # 本轮抽中非 target 组 i 的概率 → 后续状态
-            p_miss_then_hit = 0.0
+            p_target: float = wts[target_idx] / total if (mask >> target_idx) & 1 else 0.0
+            p_miss_then_hit: float = 0.0
             for i in idxs:
                 if i == target_idx:
                     continue
-                pi = wts[i] / total
-                new_mask = mask & ~(1 << i)
+                pi: float = wts[i] / total
+                new_mask: int = mask & ~(1 << i)
                 p_miss_then_hit += pi * p_hit(new_mask, k - 1)
-            # 若本轮抽中 target，命中；若抽中非target，后续命中
-            return p_target + p_miss_then_hit
+            result: float = p_target + p_miss_then_hit
+            self._norepl_cache[full_key] = result
+            return result
 
-        full_mask = (1 << len(names)) - 1
+        full_mask: int = (1 << len(names)) - 1
         return p_hit(full_mask, n_eff)
 
-    def appear_prob_analytic(self, bg_id, trait_ids, group,
-                             use_attribute=True, use_projected=True):
+    def appear_prob_analytic(self, bg_id: str, trait_ids: list[str], group: str,
+                             use_attribute: bool = True,
+                             use_projected: bool = True) -> float:
         """
         解析近似计算单组出现概率（无放回抽样模型，与游戏机制一致）。
         思路:
@@ -356,31 +388,31 @@ class SkillEngine:
         返回: float in [0,1]
         """
         gd = self.gd
-        bg = gd.backgrounds.get(bg_id)
+        bg: dict[str, Any] | None = gd.backgrounds.get(bg_id)
         if bg is None:
             return 0.0
-        gdef = gd.groups.get(group)
+        gdef: dict[str, Any] | None = gd.groups.get(group)
         if gdef is None:
             return 0.0
-        cat = gdef.get("category")
+        cat: str | None = gdef.get("category")
         if cat == "Always":  # General 恒出现
             return 1.0
 
-        n = self.num_rolls(bg_id, cat)
+        n: float = self.num_rolls(bg_id, cat)
         if n <= 0:
             return 0.0
 
         # 专属分支
-        branches = self.resolve_exclusive(bg_id)
-        total_prob = 0.0
+        branches: list[tuple[list[str], float]] = self.resolve_exclusive(bg_id)
+        total_prob: float = 0.0
         for exc_groups, branch_p in branches:
             if branch_p <= 0:
                 continue
             # 合成该类别内所有组的权重
-            cat_groups = self._groups_by_cat.get(cat, [])
-            weights = {}
+            cat_groups: list[str] = self._groups_by_cat.get(cat, [])
+            weights: dict[str, float] = {}
             for g in cat_groups:
-                w = self.compute_raw_weight(
+                w: float = self.compute_raw_weight(
                     bg_id, trait_ids, g,
                     exclusive_active=exc_groups,
                     use_attribute=use_attribute, use_projected=use_projected,
@@ -388,7 +420,7 @@ class SkillEngine:
                 if w > 0:
                     weights[g] = w
             if not weights:
-                p_appear = 0.0
+                p_appear: float = 0.0
             else:
                 p_appear = self._appear_prob_no_replacement(weights, group, n)
             total_prob += branch_p * p_appear
@@ -398,50 +430,51 @@ class SkillEngine:
     # 出现概率（蒙特卡洛）
     # ------------------------------------------------------------------
 
-    def appear_prob_monte_carlo(self, bg_id, trait_ids, group,
-                                samples=20000, seed=42,
-                                use_attribute=True, use_projected=True):
+    def appear_prob_monte_carlo(self, bg_id: str, trait_ids: list[str], group: str,
+                                samples: int = 20000, seed: int = 42,
+                                use_attribute: bool = True,
+                                use_projected: bool = True) -> float:
         """蒙特卡洛模拟单组出现概率。"""
-        rng = random.Random(seed)
+        rng: random.Random = random.Random(seed)
         gd = self.gd
-        bg = gd.backgrounds.get(bg_id)
+        bg: dict[str, Any] | None = gd.backgrounds.get(bg_id)
         if bg is None:
             return 0.0
-        gdef = gd.groups.get(group)
+        gdef: dict[str, Any] | None = gd.groups.get(group)
         if gdef is None:
             return 0.0
-        cat = gdef.get("category")
+        cat: str | None = gdef.get("category")
         if cat == "Always":
             return 1.0
-        n = self.num_rolls(bg_id, cat)
+        n: float = self.num_rolls(bg_id, cat)
         if n <= 0:
             return 0.0
-        n_int = int(round(n))
+        n_int: int = int(round(n))
 
-        branches = self.resolve_exclusive(bg_id)
+        branches: list[tuple[list[str], float]] = self.resolve_exclusive(bg_id)
         # 归一化分支概率
-        bp_sum = sum(p for _, p in branches)
+        bp_sum: float = sum(p for _, p in branches)
         if bp_sum <= 0:
             branches = [([], 1.0)]
             bp_sum = 1.0
 
-        hit = 0
-        cat_groups = self._groups_by_cat.get(cat, [])
+        hit: int = 0
+        cat_groups: list[str] = self._groups_by_cat.get(cat, [])
         for _ in range(samples):
             # 选专属分支
-            r = rng.random() * bp_sum
-            acc = 0.0
-            chosen_exc = []
+            r: float = rng.random() * bp_sum
+            acc: float = 0.0
+            chosen_exc: list[str] = []
             for exc_groups, p in branches:
                 acc += p
                 if r <= acc:
                     chosen_exc = exc_groups
                     break
             # 合成权重
-            weights = []
-            names = []
+            weights: list[float] = []
+            names: list[str] = []
             for g in cat_groups:
-                w = self.compute_raw_weight(
+                w: float = self.compute_raw_weight(
                     bg_id, trait_ids, g,
                     exclusive_active=chosen_exc,
                     use_attribute=use_attribute, use_projected=use_projected,
@@ -451,20 +484,19 @@ class SkillEngine:
                     names.append(g)
             if not weights:
                 continue
-            total_w = sum(weights)
             # 无放回抽样 n_int 次
-            chosen = set()
-            w_copy = list(weights)
-            n_copy = list(names)
+            chosen: set[str] = set()
+            w_copy: list[float] = list(weights)
+            n_copy: list[str] = list(names)
             for _k in range(min(n_int, len(n_copy))):
                 if not n_copy:
                     break
-                tw = sum(w_copy)
+                tw: float = sum(w_copy)
                 if tw <= 0:
                     break
-                rr = rng.random() * tw
-                a = 0.0
-                idx = 0
+                rr: float = rng.random() * tw
+                a: float = 0.0
+                idx: int = 0
                 for j, ww in enumerate(w_copy):
                     a += ww
                     if rr <= a:
@@ -481,14 +513,18 @@ class SkillEngine:
     # 正向模拟
     # ------------------------------------------------------------------
 
-    def forward_simulate(self, bg_id, trait_ids,
-                         mode="analytic", use_attribute=True, use_projected=True,
-                         samples=20000, seed=42):
+    def forward_simulate(self, bg_id: str, trait_ids: list[str],
+                         mode: str = "analytic",
+                         use_attribute: bool = True,
+                         use_projected: bool = True,
+                         samples: int = 20000,
+                         seed: int = 42) -> OrderedDict | None:
         """
         正向模拟：给定背景+特性，返回所有组的出现概率分布。
         返回:
           OrderedDict {group: prob}（按概率降序、组名升序），或
           None 表示无可用方案（所有可骰类别都无可用组）。
+        analytic 模式使用实例级 LRU 缓存（容量 200）。
         """
         gd = self.gd
         if bg_id not in gd.backgrounds:
@@ -496,17 +532,24 @@ class SkillEngine:
         if bg_id not in gd.complete_backgrounds():
             return None
 
-        results = OrderedDict()
-        any_available = False
+        # analytic 模式缓存
+        cache_key: tuple = ()
+        if mode == "analytic":
+            cache_key = (bg_id, tuple(sorted(trait_ids)), use_attribute, use_projected)
+            if cache_key in self._forward_cache:
+                return self._forward_cache[cache_key]
+
+        results: dict[str, float] = OrderedDict()
+        any_available: bool = False
         for group in self._all_groups:
-            gdef = gd.groups.get(group, {})
-            cat = gdef.get("category")
+            gdef: dict[str, Any] = gd.groups.get(group, {})
+            cat: str | None = gdef.get("category")
             if cat == "Always":
                 results[group] = 1.0
                 any_available = True
                 continue
             if mode == "monte_carlo":
-                p = self.appear_prob_monte_carlo(
+                p: float = self.appear_prob_monte_carlo(
                     bg_id, trait_ids, group, samples=samples, seed=seed,
                     use_attribute=use_attribute, use_projected=use_projected)
             else:
@@ -518,21 +561,33 @@ class SkillEngine:
                 any_available = True
 
         if not any_available:
+            if mode == "analytic":
+                self._forward_cache[cache_key] = None
             return None
 
         # 排序：概率降序，组名升序
-        sorted_items = sorted(results.items(), key=lambda x: (-x[1], x[0]))
-        return OrderedDict(sorted_items)
+        sorted_items: list[tuple[str, float]] = sorted(results.items(), key=lambda x: (-x[1], x[0]))
+        sorted_results: OrderedDict = OrderedDict(sorted_items)
 
-    def forward_reason_if_none(self, bg_id, trait_ids):
+        if mode == "analytic":
+            # LRU 淘汰
+            if len(self._forward_cache) >= self._forward_cache_max:
+                # 删除最早插入的一个
+                oldest: Any = next(iter(self._forward_cache))
+                del self._forward_cache[oldest]
+            self._forward_cache[cache_key] = sorted_results
+
+        return sorted_results
+
+    def forward_reason_if_none(self, bg_id: str, trait_ids: list[str]) -> str:
         """若正向模拟无可用方案，返回原因说明字符串。"""
         gd = self.gd
-        bg = gd.backgrounds.get(bg_id, {})
-        reasons = []
+        bg: dict[str, Any] = gd.backgrounds.get(bg_id, {})
+        reasons: list[str] = []
         # 检查各特性是否禁用了大量组
         for tid in trait_ids:
-            t = gd.traits.get(tid, {})
-            zeros = [g for g, w in t.get("weights", {}).items() if w == 0.0]
+            t: dict[str, Any] = gd.traits.get(tid, {})
+            zeros: list[str] = [g for g, w in t.get("weights", {}).items() if w == 0.0]
             if zeros:
                 reasons.append(f"特性「{tid}」禁用了组: {', '.join(zeros)}")
         if bg.get("melee_only"):
@@ -545,10 +600,17 @@ class SkillEngine:
     # 反向推导
     # ------------------------------------------------------------------
 
-    def reverse_derive(self, target_groups, weights=None,
-                       mode="analytic", multi_trait=False, max_traits=2,
-                       use_attribute=True, use_projected=True,
-                       top_n=None, tiebreak_limit=20):
+    def reverse_derive(self, target_groups: list[str],
+                       weights: dict[str, float] | None = None,
+                       mode: str = "analytic",
+                       multi_trait: bool = False,
+                       max_traits: int = 2,
+                       use_attribute: bool = True,
+                       use_projected: bool = True,
+                       top_n: int | None = None,
+                       tiebreak_limit: int = 20,
+                       prune_threshold: int = 20,
+                       progress_callback: Callable[[int, int], bool | None] | None = None) -> dict[str, Any]:
         """
         反向推导：找出使目标组（们）出现概率最大的背景+特性组合。
         参数:
@@ -559,24 +621,26 @@ class SkillEngine:
           max_traits: 多特性时最多组合几个
           top_n: 最多返回多少个结果（None=不限）；并列过多时配合 tiebreak 排序取前 N
           tiebreak_limit: 并列结果超过此数时启用"次要组干扰最小"次级排序
+          prune_threshold: 两阶段剪枝阈值。>0 时启用剪枝；设为 0 禁用。
+          progress_callback: 可选，callable(current, total) — 每完成一个背景调用一次。
+            回调返回 True 中断计算（用于取消）。
         返回:
           {
             "max_score": float,
-            "tied_count": int,           # 并列最大组合总数（排序前）
+            "tied_count": int,
             "results": [(bg_id, (trait_ids,), score, group_probs, purity), ...]
-                       按 背景名升序、特性名升序、干扰分升序 排列
           }
-          或 {"max_score": 0, "results": [], "tied_count": 0} 表示无任何组合可生成目标组。
+          或 {"max_score": 0, "results": [], "tied_count": 0}。
         """
         gd = self.gd
         if weights is None:
             weights = {g: 1.0 for g in target_groups}
-        bgs = gd.complete_backgrounds()
-        trait_names = sorted(gd.traits.keys())
+        bgs: list[str] = gd.complete_backgrounds()
+        trait_names: list[str] = sorted(gd.traits.keys())
 
         # 构造待遍历的特性组合
         if not multi_trait:
-            trait_combos = [[]] + [[t] for t in trait_names]
+            trait_combos: list[list[str]] = [[]] + [[t] for t in trait_names]
         else:
             from itertools import combinations
             trait_combos = [[]]
@@ -584,10 +648,44 @@ class SkillEngine:
                 for combo in combinations(trait_names, k):
                     trait_combos.append(list(combo))
 
-        best_score = 0.0
-        best_results = []
+        # ── 两阶段剪枝 ──
+        candidate_bgs: list[str] = bgs
+        if prune_threshold > 0 and len(bgs) > prune_threshold:
+            # 阶段1: 仅无特性组合，筛选前 prune_threshold 个高分背景
+            phase1_scores: list[tuple[str, float]] = []
+            for bg_id in bgs:
+                group_probs: dict[str, float] = {}
+                score: float = 0.0
+                for g in target_groups:
+                    if mode == "monte_carlo":
+                        p: float = self.appear_prob_monte_carlo(
+                            bg_id, [], g, use_attribute=use_attribute,
+                            use_projected=use_projected)
+                    else:
+                        p = self.appear_prob_analytic(
+                            bg_id, [], g, use_attribute=use_attribute,
+                            use_projected=use_projected)
+                    group_probs[g] = p
+                    score += weights.get(g, 1.0) * p
+                if score > 0:
+                    phase1_scores.append((bg_id, score))
+            phase1_scores.sort(key=lambda x: -x[1])
+            candidate_bgs = [bg_id for bg_id, _ in phase1_scores[:prune_threshold]]
+            if not candidate_bgs:
+                return {"max_score": 0.0, "results": [], "tied_count": 0}
+            # 阶段2: 仅对高分背景遍历特性组合
 
-        for bg_id in bgs:
+        best_score: float = 0.0
+        best_results: list[tuple[str, tuple[str, ...], float, dict[str, float]]] = []
+
+        total_bgs: int = len(candidate_bgs)
+        for bg_idx, bg_id in enumerate(candidate_bgs):
+            # 进度回调 + 取消支持
+            if progress_callback is not None:
+                should_cancel: bool | None = progress_callback(bg_idx, total_bgs)
+                if should_cancel:
+                    return {"max_score": 0.0, "results": [], "tied_count": 0,
+                            "cancelled": True}
             for combo in trait_combos:
                 # 计算各目标组出现概率
                 group_probs = {}
@@ -609,22 +707,22 @@ class SkillEngine:
                 elif abs(score - best_score) <= EPS and best_score > 0:
                     best_results.append((bg_id, tuple(combo), score, group_probs))
 
-        tied_count = len(best_results)
+        tied_count: int = len(best_results)
         if best_score <= 0 or not best_results:
             return {"max_score": 0.0, "results": [], "tied_count": 0}
 
         # 并列过多时，计算"次要组干扰分"(purity) 用于次级排序
         # purity = 该组合下非目标组的出现概率总和（越小越纯粹，越靠前）
-        use_tiebreak = tied_count > tiebreak_limit
-        scored = []
+        use_tiebreak: bool = tied_count > tiebreak_limit
+        scored: list[tuple[str, tuple[str, ...], float, dict[str, float], float]] = []
         for bg_id, combo, score, group_probs in best_results:
-            purity = 0.0
+            purity: float = 0.0
             if use_tiebreak:
                 # 计算非目标组的总出现概率
                 for g in self._all_groups:
                     if g in target_groups:
                         continue
-                    gdef = gd.groups.get(g, {})
+                    gdef: dict[str, Any] = gd.groups.get(g, {})
                     if gdef.get("category") == "Always":
                         continue
                     if mode == "monte_carlo":
@@ -653,18 +751,22 @@ class SkillEngine:
     # 综合得分（多目标加权，单目标即该组概率）
     # ------------------------------------------------------------------
 
-    def score_combination(self, bg_id, trait_ids, target_groups, weights=None,
-                          mode="analytic", use_attribute=True, use_projected=True):
+    def score_combination(self, bg_id: str, trait_ids: list[str],
+                          target_groups: list[str],
+                          weights: dict[str, float] | None = None,
+                          mode: str = "analytic",
+                          use_attribute: bool = True,
+                          use_projected: bool = True) -> tuple[float, dict[str, float]]:
         """计算某背景+特性组合对目标组集合的加权得分。"""
         if weights is None:
             weights = {g: 1.0 for g in target_groups}
-        score = 0.0
-        probs = {}
+        score: float = 0.0
+        probs: dict[str, float] = {}
         for g in target_groups:
             if mode == "monte_carlo":
-                p = self.appear_prob_monte_carlo(bg_id, trait_ids, g,
-                                                 use_attribute=use_attribute,
-                                                 use_projected=use_projected)
+                p: float = self.appear_prob_monte_carlo(bg_id, trait_ids, g,
+                                                         use_attribute=use_attribute,
+                                                         use_projected=use_projected)
             else:
                 p = self.appear_prob_analytic(bg_id, trait_ids, g,
                                               use_attribute=use_attribute,
@@ -678,6 +780,7 @@ class SkillEngine:
 # 自测
 # ---------------------------------------------------------------------------
 
+
 if __name__ == "__main__":
     from data_loader import load_data
     import os
@@ -685,30 +788,34 @@ if __name__ == "__main__":
     gd = load_data(os.path.join(here, "data.json"))
     eng = SkillEngine(gd)
 
-    print("=== 自测1: adventurous_noble + [] 正向模拟（analytic 无放回）===")
+    print("=== Self-test 1: adventurous_noble + [] forward (analytic) ===")
     res = eng.forward_simulate("adventurous_noble_background", [], mode="analytic")
     if res:
         for g, p in list(res.items())[:12]:
             print(f"  {g:20} {p:.3f}")
-        print(f"  ... 共 {len(res)} 组")
+        print(f"  ... {len(res)} groups")
     else:
-        print("  无可用方案")
+        print("  No valid build")
 
-    print("\n=== 自测2: analytic vs monte_carlo 一致性 (assassin, []) ===")
+    print()
+    print("=== Self-test 2: analytic vs monte_carlo (assassin, []) ===")
     for g in ["Dagger", "Light Armor", "Cleaver", "Hammer", "Mace", "Axe", "Sword"]:
         pa = eng.appear_prob_analytic("assassin_background", [], g)
         pm = eng.appear_prob_monte_carlo("assassin_background", [], g, samples=30000, seed=42)
         print(f"  {g:14} analytic={pa:.3f}  monte={pm:.3f}  diff={abs(pa-pm):.3f}")
 
-    print("\n=== 自测3: 反向推导 Dagger（加次序）===")
-    rd = eng.reverse_derive(["Dagger"], mode="analytic", top_n=10, tiebreak_limit=20)
-    print(f"  max_score={rd['max_score']:.3f}, 并列总数={rd['tied_count']}, 启用加次序={rd.get('tiebreak_used')}")
-    for bg, traits, score, probs, purity in rd["results"][:10]:
-        print(f"    {bg:40} {traits} score={score:.3f} 干扰={purity:.2f} Dagger={probs['Dagger']:.3f}")
+    print()
+    print("=== Self-test 3: reverse derive Dagger (pruning) ===")
+    rd = eng.reverse_derive(["Dagger"], mode="analytic", top_n=10, tiebreak_limit=20, prune_threshold=20,
+                             progress_callback=lambda c, t: print(f"  Progress: {c+1}/{t}", flush=True) or False)
+    print(f"  max_score={rd['max_score']:.3f}, tied={rd['tied_count']}, tiebreak={rd.get('tiebreak_used')}")
+    for bg, traits, score, probs, purity in rd["results"][:3]:
+        print(f"    {bg:40} {traits} score={score:.3f} noise={purity:.2f} Dagger={probs['Dagger']:.3f}")
 
-    print("\n=== 自测4: 反向推导多目标 [Heavy Armor, Shield, Trained] ===")
-    rd2 = eng.reverse_derive(["Heavy Armor", "Shield", "Trained"], mode="analytic", top_n=5, tiebreak_limit=20)
-    print(f"  max_score={rd2['max_score']:.3f}, 并列总数={rd2['tied_count']}, 启用加次序={rd2.get('tiebreak_used')}")
-    for bg, traits, score, probs, purity in rd2["results"][:5]:
+    print()
+    print("=== Self-test 4: reverse derive multi [Heavy Armor, Shield, Trained] ===")
+    rd2 = eng.reverse_derive(["Heavy Armor", "Shield", "Trained"], mode="analytic", top_n=5, tiebreak_limit=20, prune_threshold=20)
+    print(f"  max_score={rd2['max_score']:.3f}, tied={rd2['tied_count']}, tiebreak={rd2.get('tiebreak_used')}")
+    for bg, traits, score, probs, purity in rd2["results"][:3]:
         ha = probs['Heavy Armor']; sh = probs['Shield']; tr = probs['Trained']
         print(f"    {bg:40} {traits} score={score:.3f} HA={ha:.2f} Sh={sh:.2f} Tr={tr:.2f}")

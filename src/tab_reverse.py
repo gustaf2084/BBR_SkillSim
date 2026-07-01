@@ -5,13 +5,14 @@ Reverse derivation page: select target skill tree groups (multi-select), find be
 background + trait combinations.
 """
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtGui import QColor, QBrush, QFont, QIcon
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem,
     QCheckBox, QPushButton, QTableWidget, QTableWidgetItem, QLabel, QHeaderView,
     QGroupBox, QSpinBox, QMessageBox, QSplitter, QDoubleSpinBox, QComboBox,
     QScrollArea, QFrame, QGridLayout, QDialog, QDialogButtonBox,
+    QProgressBar, QApplication, QFileDialog, QLineEdit,
 )
 from i18n import t, cat_name, prob_tier_metal
 
@@ -27,6 +28,48 @@ CAT_COLOR = {
 }
 
 
+class ReverseDeriveWorker(QThread):
+    """Worker thread for reverse_derive to prevent UI freezing."""
+    progress = Signal(int, int)    # current, total
+    finished = Signal(object)      # result dict
+    error = Signal(str)            # error message
+
+    def __init__(self, engine, targets, mode, multi_trait, top_n,
+                 use_attribute=True, use_projected=True):
+        super().__init__()
+        self.engine = engine
+        self.targets = targets
+        self.mode = mode
+        self.multi_trait = multi_trait
+        self.top_n = top_n
+        self.use_attribute = use_attribute
+        self.use_projected = use_projected
+
+    def run(self):
+        try:
+            def on_progress(current, total):
+                if self.isInterruptionRequested():
+                    return True  # 返回 True 让引擎中止计算
+                self.progress.emit(current, total)
+                return False
+
+            result = self.engine.reverse_derive(
+                self.targets,
+                mode=self.mode,
+                multi_trait=self.multi_trait,
+                max_traits=2,
+                top_n=self.top_n,
+                tiebreak_limit=20,
+                progress_callback=on_progress,
+                use_attribute=self.use_attribute,
+                use_projected=self.use_projected,
+            )
+            if not result.get("cancelled"):
+                self.finished.emit(result)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 class ReverseTab(QWidget):
     """Reverse derivation page."""
 
@@ -38,6 +81,7 @@ class ReverseTab(QWidget):
         self._cat_panels = {}       # category -> QGroupBox
         self._cat_checkboxes = {}   # category -> list of (QCheckBox, group_id)
         self._last_results = None
+        self._worker = None         # QThread worker
         self._build_ui()
 
     def _build_ui(self):
@@ -52,6 +96,17 @@ class ReverseTab(QWidget):
         # target group selection area (scrollable)
         self._target_grp = QGroupBox(t("reverse.target_title"))
         target_lv = QVBoxLayout(self._target_grp)
+
+        # search filter
+        self.target_search = QLineEdit()
+        self.target_search.setPlaceholderText(t("reverse.search_ph"))
+        self.target_search.setClearButtonEnabled(True)
+        self.target_search.setStyleSheet(
+            "QLineEdit { padding: 4px 8px; border: 1px solid #DDD6CC; "
+            "border-radius: 4px; background: #FFFEF9; font-size: 12px; }")
+        self.target_search.textChanged.connect(self._on_target_search)
+        target_lv.addWidget(self.target_search)
+
         target_scroll = QScrollArea()
         target_scroll.setWidgetResizable(True)
         target_scroll.setFrameShape(QFrame.NoFrame)
@@ -92,6 +147,27 @@ class ReverseTab(QWidget):
         self.derive_btn.clicked.connect(self._on_derive)
         lv.addWidget(self.derive_btn)
 
+        # progress bar + cancel (hidden by default)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setVisible(False)
+        lv.addWidget(self.progress_bar)
+
+        self.progress_label = QLabel("")
+        self.progress_label.setStyleSheet("font-size: 11px; color: #6B6359;")
+        self.progress_label.setVisible(False)
+        lv.addWidget(self.progress_label)
+
+        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.setStyleSheet(
+            "QPushButton { font-size: 11px; padding: 4px 12px; "
+            "background: #F0E0E0; border: 1px solid #C0392B; border-radius: 4px; "
+            "color: #C0392B; }"
+            "QPushButton:hover { background: #E8D0D0; }")
+        self.cancel_btn.setVisible(False)
+        self.cancel_btn.clicked.connect(self._on_cancel)
+        lv.addWidget(self.cancel_btn)
+
         splitter.addWidget(left)
 
         # ===== RIGHT: results =====
@@ -123,6 +199,25 @@ class ReverseTab(QWidget):
         self.result_table.setAlternatingRowColors(True)
         self.result_table.itemDoubleClicked.connect(self._on_row_double_clicked)
         rv.addWidget(self.result_table, 1)
+
+        # Export button row
+        export_row = QHBoxLayout()
+        export_row.addStretch()
+        self.copy_btn = QPushButton(t("reverse.copy_btn"))
+        self.copy_btn.setStyleSheet(
+            "QPushButton { padding: 4px 16px; border: 1px solid #BBB; "
+            "border-radius: 4px; font-size: 12px; }"
+            "QPushButton:hover { background: #E8E4DC; }")
+        self.copy_btn.clicked.connect(self._copy_as_text)
+        export_row.addWidget(self.copy_btn)
+        self.export_btn = QPushButton(t("reverse.export_btn"))
+        self.export_btn.setStyleSheet(
+            "QPushButton { padding: 4px 16px; border: 1px solid #BBB; "
+            "border-radius: 4px; font-size: 12px; }"
+            "QPushButton:hover { background: #E8E4DC; }")
+        self.export_btn.clicked.connect(self._export_csv)
+        export_row.addWidget(self.export_btn)
+        rv.addLayout(export_row)
 
         # empty result notice
         self.empty_label = QWidget()
@@ -161,6 +256,9 @@ class ReverseTab(QWidget):
         self.mode_combo.setItemText(0, t("mode.analytic"))
         self.mode_combo.setItemText(1, t("mode.monte_slow"))
         self.derive_btn.setText(t("reverse.derive_btn"))
+        self.target_search.setPlaceholderText(t("reverse.search_ph"))
+        self.copy_btn.setText(t("reverse.copy_btn"))
+        self.export_btn.setText(t("reverse.export_btn"))
         self._empty_title_lbl.setText(t("reverse.empty_title"))
         self._empty_body_lbl.setText(t("reverse.empty_body"))
         # result title
@@ -258,13 +356,50 @@ class ReverseTab(QWidget):
         top_n = self.topn_spin.value()
         mode = self.mode_combo.currentData()
 
-        try:
-            rd = self.engine.reverse_derive(
-                targets, mode=mode, multi_trait=multi_trait, max_traits=2,
-                top_n=top_n, tiebreak_limit=20)
-        except Exception as e:
-            QMessageBox.critical(self, t("reverse.err_title"),
-                                 t("reverse.err_prefix") + str(e))
+        # show progress UI, disable derive button
+        self.derive_btn.setEnabled(False)
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
+        self.progress_label.setVisible(True)
+        self.progress_label.setText("Calculating...")
+        self.cancel_btn.setVisible(True)
+
+        # start worker thread
+        self._worker = ReverseDeriveWorker(
+            self.engine, targets, mode, multi_trait, top_n)
+        self._worker.progress.connect(self._on_worker_progress)
+        self._worker.finished.connect(self._on_worker_finished)
+        self._worker.error.connect(self._on_worker_error)
+        self._worker.start()
+
+    def _on_worker_progress(self, current, total):
+        if total > 0:
+            pct = int((current + 1) / total * 100)
+            self.progress_bar.setValue(pct)
+            self.progress_label.setText(
+                f"Processing background {current + 1} of {total}...")
+
+    def _on_worker_finished(self, result):
+        self._finish_derive(result)
+
+    def _on_worker_error(self, err_msg):
+        QMessageBox.critical(self, t("reverse.err_title"),
+                             t("reverse.err_prefix") + err_msg)
+        self._finish_derive(None)
+
+    def _on_cancel(self):
+        if self._worker and self._worker.isRunning():
+            self._worker.requestInterruption()
+
+    def _finish_derive(self, rd):
+        """Common cleanup after derive (threaded or direct)."""
+        self._worker = None
+        self.derive_btn.setEnabled(True)
+        self.progress_bar.setVisible(False)
+        self.progress_label.setVisible(False)
+        self.cancel_btn.setVisible(False)
+
+        if rd is None:
             return
 
         self._last_results = rd
@@ -279,7 +414,13 @@ class ReverseTab(QWidget):
             self._last_results = None
             return
 
-        multi = len(targets) > 1
+        multi = len([c for cbs in self._cat_checkboxes.values()
+                     for cb, _ in cbs if cb.isChecked()]) > 1
+        targets = []
+        for cat, cbs in self._cat_checkboxes.items():
+            for cb, gid in cbs:
+                if cb.isChecked():
+                    targets.append(gid)
         title = t("reverse.result_ok_prefix") + " / ".join(self.gd.group_name(t) for t in targets)
         if len(title) > 80:
             title = title[:77] + "..."
@@ -416,3 +557,58 @@ class ReverseTab(QWidget):
         dlv.addWidget(btns)
 
         dlg.exec()
+
+    def _on_target_search(self, text):
+        """Filter target group checkboxes by search text."""
+        q = text.strip().lower()
+        for cat, cbs in self._cat_checkboxes.items():
+            any_visible = False
+            for cb, gid in cbs:
+                visible = q in cb.text().lower() if q else True
+                cb.setVisible(visible)
+                if visible:
+                    any_visible = True
+            panel = self._cat_panels.get(cat)
+            if panel:
+                panel.setVisible(any_visible)
+
+    # ── export ──────────────────────────────────────────────
+
+    def _rows_data(self):
+        """Yield (bg_id, display_name, traits, score, purity) for each result row."""
+        for row in range(self.result_table.rowCount()):
+            bg_item = self.result_table.item(row, 0)
+            trait_item = self.result_table.item(row, 1)
+            score_item = self.result_table.item(row, 2)
+            purity_item = self.result_table.item(row, 3)
+            if not bg_item or not trait_item:
+                continue
+            bg_text = bg_item.text().strip()
+            bg_id = ""
+            if "(" in bg_text and bg_text.endswith(")"):
+                bg_id = bg_text[bg_text.rindex("(") + 1:-1]
+            traits_text = trait_item.text().strip()
+            score_text = score_item.text().strip() if score_item else ""
+            purity_text = purity_item.text().strip() if purity_item else ""
+            yield bg_id, bg_text, traits_text, score_text, purity_text
+
+    def _copy_as_text(self):
+        """Copy current table as TSV to clipboard."""
+        lines = ["Background ID\tDisplay Name\tTraits\tScore\tPurity"]
+        for bg_id, bg_text, traits_text, score_text, purity_text in self._rows_data():
+            lines.append(f"{bg_id}\t{bg_text}\t{traits_text}\t{score_text}\t{purity_text}")
+        QApplication.clipboard().setText("\n".join(lines))
+
+    def _export_csv(self):
+        """Save current table as CSV file."""
+        path, _ = QFileDialog.getSaveFileName(
+            self, t("reverse.export_title"), "reverse_results.csv",
+            "CSV (*.csv);;All Files (*)")
+        if not path:
+            return
+        import csv
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.writer(f)
+            w.writerow(["Background ID", "Display Name", "Traits", "Score", "Purity"])
+            for bg_id, bg_text, traits_text, score_text, purity_text in self._rows_data():
+                w.writerow([bg_id, bg_text, traits_text, score_text, purity_text])

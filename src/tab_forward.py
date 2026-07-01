@@ -9,9 +9,9 @@ from PySide6.QtWidgets import (
     QCheckBox, QPushButton, QTableWidget, QTableWidgetItem,
     QLabel, QHeaderView, QGroupBox, QProgressBar, QMessageBox, QSplitter,
     QAbstractItemView, QGridLayout, QScrollArea, QSizePolicy, QFrame,
-    QCompleter,
+    QCompleter, QApplication, QFileDialog, QLineEdit,
 )
-from skill_tree_widget import SkillTreeWidget
+from skill_tree_widget import SkillTreeWidget, build_skill_tree_data
 from i18n import t, prob_tier_label, cat_name
 
 # Category display colors (visual only, not language-specific)
@@ -67,6 +67,16 @@ class ForwardTab(QWidget):
         self._trait_label = QLabel(t("forward.traits_label"))
         self._trait_label.setStyleSheet("font-weight:bold;")
         bf.addRow(self._trait_label)
+
+        # trait search filter
+        self.trait_search = QLineEdit()
+        self.trait_search.setPlaceholderText(t("forward.trait_search_ph"))
+        self.trait_search.setClearButtonEnabled(True)
+        self.trait_search.setStyleSheet(
+            "QLineEdit { padding: 4px 8px; border: 1px solid #DDD6CC; "
+            "border-radius: 4px; background: #FFFEF9; font-size: 12px; }")
+        self.trait_search.textChanged.connect(self._on_trait_search)
+        bf.addRow(self.trait_search)
 
         lv.addWidget(self._bg_grp)
 
@@ -161,6 +171,25 @@ class ForwardTab(QWidget):
         self.result_table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.result_table.itemClicked.connect(self._on_table_click)
         tv.addWidget(self.result_table)
+
+        # Export button row
+        export_row = QHBoxLayout()
+        export_row.addStretch()
+        self.copy_btn = QPushButton(t("forward.copy_btn"))
+        self.copy_btn.setStyleSheet(
+            "QPushButton { padding: 4px 16px; border: 1px solid #BBB; "
+            "border-radius: 4px; font-size: 12px; }"
+            "QPushButton:hover { background: #E8E4DC; }")
+        self.copy_btn.clicked.connect(self._copy_as_text)
+        export_row.addWidget(self.copy_btn)
+        self.export_btn = QPushButton(t("forward.export_btn"))
+        self.export_btn.setStyleSheet(
+            "QPushButton { padding: 4px 16px; border: 1px solid #BBB; "
+            "border-radius: 4px; font-size: 12px; }"
+            "QPushButton:hover { background: #E8E4DC; }")
+        self.export_btn.clicked.connect(self._export_csv)
+        export_row.addWidget(self.export_btn)
+        tv.addLayout(export_row)
         self.inner_splitter.addWidget(top)
 
         # skill tree
@@ -217,6 +246,9 @@ class ForwardTab(QWidget):
         self.mode_combo.setItemText(0, t("mode.analytic"))
         self.mode_combo.setItemText(1, t("mode.monte"))
         self.calc_btn.setText(t("forward.calc_btn"))
+        self.trait_search.setPlaceholderText(t("forward.trait_search_ph"))
+        self.copy_btn.setText(t("forward.copy_btn"))
+        self.export_btn.setText(t("forward.export_btn"))
         self._none_title_lbl.setText(t("forward.none_title"))
         self._table_caption.setText(t("forward.table_caption"))
         # result title: keep placeholder or recompute
@@ -373,20 +405,11 @@ class ForwardTab(QWidget):
             self.result_table.setRowHeight(row, 38)
 
     def _fill_skill_tree(self, results):
-        trees = []
-        for group, prob in results.items():
-            if prob <= 0:
-                continue
-            if self.gd.group_category(group) == "Always":
-                continue
-            pt = self.gd.get_perk_tree(group)
-            trees.append({
-                "group_id": group,
-                "group_name": self.gd.group_name(group),
-                "probability": prob,
-                "tiers": pt,
-            })
-        self.skill_tree.set_trees(trees)
+        trees = build_skill_tree_data(self.gd, results)
+        if trees is None:
+            self.skill_tree.clear()
+        else:
+            self.skill_tree.set_trees(trees)
 
     def _on_table_click(self, item):
         row = item.row()
@@ -396,3 +419,48 @@ class ForwardTab(QWidget):
         gid = ni.data(Qt.UserRole)
         if gid:
             self.skill_tree.scroll_to_group(gid)
+
+    def _on_trait_search(self, text):
+        """Filter trait checkboxes by search text."""
+        q = text.strip().lower()
+        for cb in self._trait_checkboxes:
+            cb.setVisible(q in cb.text().lower() if q else True)
+
+    # ── export ──────────────────────────────────────────────
+
+    def _rows_data(self):
+        """Yield (group_id, display_name, category, prob) for each non-empty row."""
+        for row in range(self.result_table.rowCount()):
+            ni = self.result_table.item(row, 1)
+            if ni is None:
+                continue
+            gid = ni.data(Qt.UserRole) or ""
+            name = ni.text()
+            ci = self.result_table.item(row, 2)
+            cat = ci.text().strip() if ci else ""
+            pi = self.result_table.item(row, 3)
+            prob_text = pi.text() if pi else "0%"
+            yield gid, name, cat, prob_text
+
+    def _copy_as_text(self):
+        """Copy current table as TSV to clipboard."""
+        lines = ["Group ID\tDisplay Name\tCategory\tProbability"]
+        for gid, name, cat, prob_text in self._rows_data():
+            lines.append(f"{gid}\t{name}\t{cat}\t{prob_text}")
+        QApplication.clipboard().setText("\n".join(lines))
+
+    def _export_csv(self):
+        """Save current table as CSV file."""
+        if self.gd is None:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, t("forward.export_title"), "forward_results.csv",
+            "CSV (*.csv);;All Files (*)")
+        if not path:
+            return
+        import csv
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.writer(f)
+            w.writerow(["Group ID", "Display Name", "Category", "Probability"])
+            for gid, name, cat, prob_text in self._rows_data():
+                w.writerow([gid, name, cat, prob_text])

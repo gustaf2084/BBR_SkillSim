@@ -2,10 +2,13 @@
 __pycache__/
 *.py[cod]
 *.pyo
+.pytest_cache/
 
 # PyInstaller
 build/
 dist/
+src/dist/
+src/build/
 *.spec.bak
 
 # IDE
@@ -18,5 +21,11 @@ Thumbs.db
 
 # Release binaries (too large for GitHub; use Releases for download)
 release/
+
 # Runtime
 settings.json
+src/settings.json
+
+# Temporary
+*.tmp
+*.log

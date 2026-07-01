@@ -24,6 +24,9 @@ a = Analysis(
     binaries=[],
     datas=[
         ('data.json', '.'),
+        ('perk_trees.json', '.'),
+        ('perk_i18n.json', '.'),
+        ('../VERSION', '.'),
     ],
     hiddenimports=[
         'tab_forward',
@@ -70,6 +73,8 @@ a = Analysis(
         'PySide6.QtDesigner',       # UI 设计器
         'PySide6.QtHelp',
         'PySide6.QtPrintSupport',
+        # === Qt 翻译文件（~10MB，项目使用自定义 i18n）===
+        'PySide6.QtCore.QTranslator',
         # === 开发/测试工具 ===
         'unittest', 'pytest',
     ],
@@ -91,7 +96,7 @@ exe = EXE(
     name='BBR_SkillSimulator',
     debug=False,
     bootloader_ignore_signals=False,
-    strip=False,
+    strip=True,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,

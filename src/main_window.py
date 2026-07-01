@@ -15,6 +15,24 @@ from icon_provider import IconProvider
 from i18n import set_lang as i18n_set_lang, t
 
 
+def _read_version():
+    """Read version from VERSION file (one line). Falls back to 'dev'."""
+    # Primary: VERSION next to exe (frozen) or in src/ (dev with VERSION copied)
+    version_file = os.path.join(exe_dir(), "VERSION")
+    try:
+        with open(version_file, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        pass
+    # Fallback: project root (dev mode where VERSION is ../ relative to src)
+    try:
+        version_file = os.path.join(os.path.dirname(exe_dir()), "VERSION")
+        with open(version_file, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        return "dev"
+
+
 def exe_dir():
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
@@ -32,7 +50,8 @@ class MainWindow(QMainWindow):
 
     def __init__(self, data_path=None):
         super().__init__()
-        self.setWindowTitle("BBR Skill Simulator")
+        self._version = _read_version()
+        self.setWindowTitle(f"BBR Skill Simulator v{self._version}")
         self.resize(1180, 760)
         self.init_errors = []
         self._data_error = None
@@ -64,6 +83,34 @@ class MainWindow(QMainWindow):
         self._build_ui()
         if self.gd is not None:
             self._build_statusbar()
+            self._restore_state()
+
+    def _restore_state(self):
+        """Restore window geometry and last session state from settings."""
+        s = _load_settings(exe_dir())
+        win = s.get("window")
+        if win and isinstance(win, dict):
+            x = win.get("x")
+            y = win.get("y")
+            w = win.get("w")
+            h = win.get("h")
+            if all(v is not None for v in (x, y, w, h)):
+                self.setGeometry(x, y, w, h)
+        # Restore last tab
+        last_tab = s.get("last_tab")
+        if isinstance(last_tab, int) and 0 <= last_tab < self.nav.count():
+            self.nav.setCurrentRow(last_tab)
+
+    def closeEvent(self, event):
+        """Save session state before closing."""
+        s = _load_settings(exe_dir())
+        # Window geometry
+        g = self.geometry()
+        s["window"] = {"x": g.x(), "y": g.y(), "w": g.width(), "h": g.height()}
+        # Last active tab
+        s["last_tab"] = self.nav.currentRow()
+        _save_settings(exe_dir(), s)
+        super().closeEvent(event)
 
     def _toggle_lang(self):
         if self.gd is None:
@@ -196,6 +243,7 @@ class MainWindow(QMainWindow):
             for pg in [self.forward_tab, self.reverse_tab, self.builds_tab]:
                 if pg and hasattr(pg, "on_data_ready"):
                     pg.on_data_ready(self.gd, self.engine, self.icon_provider)
+            self._setup_shortcuts()
         except Exception:
             self.gd = None
             self._data_error = "[tabs] " + traceback.format_exc()
@@ -246,7 +294,7 @@ class MainWindow(QMainWindow):
     def _build_statusbar(self):
         sb = QStatusBar()
         self.setStatusBar(sb)
-        sb.showMessage("v0.0.3", 0)
+        sb.showMessage(f"v{self._version}", 0)
 
     def _on_nav(self, row):
         self.stack.setCurrentIndex(row)

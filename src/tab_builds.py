@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QColor, QBrush, QFont
 
-from skill_tree_widget import SkillTreeWidget
+from skill_tree_widget import SkillTreeWidget, build_skill_tree_data
 from build_parser import scan_builds, generate_template, create_example_file
 from i18n import t
 
@@ -579,20 +579,8 @@ class BuildsTab(QWidget):
     # ── skill tree matrix ────────────────────────────────────────
 
     def _fill_skill_tree(self, results):
-        if results is None:
+        trees = build_skill_tree_data(self.gd, results)
+        if trees is None:
             self.skill_tree.clear()
-            return
-        trees = []
-        for group, prob in results.items():
-            if prob <= 0:
-                continue
-            if self.gd.group_category(group) == "Always":
-                continue
-            perk_tiers = self.gd.get_perk_tree(group)
-            trees.append({
-                "group_id": group,
-                "group_name": self.gd.group_name(group),
-                "probability": prob,
-                "tiers": perk_tiers,
-            })
-        self.skill_tree.set_trees(trees)
+        else:
+            self.skill_tree.set_trees(trees)
