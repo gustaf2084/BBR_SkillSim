@@ -409,3 +409,65 @@ class TestV030BgAttributes:
         w_high = engine.attribute_star_weight("Trained", talent_stars=high_stars)
         w_low = engine.attribute_star_weight("Trained", talent_stars=low_stars)
         assert w_high > w_low, f"Stars=3 weight ({w_high}) should be > stars=0 ({w_low})"
+
+
+class TestFractionalExclusiveRolls:
+    """v0.4.0: Exclusive 基线 0.5 = 50% 概率额外骰一次专属组。
+
+    非保证但有正权重的专属组因此获得 0.5×权重占比 的出现概率
+    （此前 int(round(0.5))=0 使其恒为 0%）。保证组概率不受影响。
+    """
+
+    # (bg, 非保证目标组, 期望概率)  期望值 = 0.5 × 目标权重 / 池内总权重
+    CASES = [
+        ("swordmaster_background", "Swordmaster", 0.25),      # 池 {Soldier:1, Swordmaster:1}
+        ("rf_old_swordmaster_background", "Swordmaster", 0.25),
+        ("fisherman_background", "Trapper", 0.25),
+        ("old_gladiator_background", "Trapper", 0.25),
+    ]
+
+    @pytest.mark.parametrize("bg,target,expected", CASES)
+    def test_nonguaranteed_exclusive_now_positive(self, engine, bg, target, expected):
+        p = engine.appear_prob_analytic(bg, [], target)
+        assert p == pytest.approx(expected, abs=0.01), (
+            f"{bg} {target}: expected ≈{expected}, got {p:.4f}")
+
+    def test_barbarian_wildling_positive(self, engine):
+        """barbarian 的 Wildling(非保证,权重 0.203)不再是 0。"""
+        p = engine.appear_prob_analytic("barbarian_background", [], "Wildling")
+        assert 0.05 < p < 0.20, f"Expected ~0.10, got {p:.4f}"
+
+    def test_guaranteed_probs_unchanged(self, engine):
+        """保证组概率仍由保证机制给出,不受分数骰组影响。"""
+        assert engine.appear_prob_analytic(
+            "swordmaster_background", [], "Soldier") == pytest.approx(1.0)
+        assert engine.appear_prob_analytic(
+            "barbarian_background", [], "Raider") == pytest.approx(0.625)
+        assert engine.appear_prob_analytic(
+            "barbarian_background", [], "Laborer") == pytest.approx(0.25)
+
+    def test_analytic_matches_monte_carlo(self, engine):
+        """分数骰组路径的解析与蒙特卡洛一致（±0.02）。"""
+        for bg, target in [("swordmaster_background", "Swordmaster"),
+                           ("barbarian_background", "Wildling")]:
+            pa = engine.appear_prob_analytic(bg, [], target)
+            pm = engine.appear_prob_monte_carlo(bg, [], target, samples=8000, seed=7)
+            assert pm == pytest.approx(pa, abs=0.02), (
+                f"{bg} {target}: analytic={pa:.4f} mc={pm:.4f}")
+
+    def test_forward_simulate_includes_fractional(self, engine):
+        """forward_simulate 结果里非保证专属组概率为正。"""
+        res = engine.forward_simulate("swordmaster_background", [], mode="analytic")
+        assert res is not None
+        assert res.get("Swordmaster", 0) == pytest.approx(0.25, abs=0.01)
+        assert res.get("Soldier", 0) == pytest.approx(1.0)
+
+    def test_integer_rolls_unaffected(self, engine):
+        """整数骰组类别(如 Weapon)的概率路径与分数逻辑无关——单组池 n=1 应为 1。"""
+        p = engine._appear_prob_no_replacement({"OnlyGroup": 2.0}, "OnlyGroup", 1.0)
+        assert p == 1.0
+
+    def test_fractional_single_group_pool(self, engine):
+        """单组池 n=0.5 → 0.5(而非旧逻辑的 0 或 len==1 捷径的 1)。"""
+        p = engine._appear_prob_no_replacement({"OnlyGroup": 2.0}, "OnlyGroup", 0.5)
+        assert p == pytest.approx(0.5)

@@ -19,6 +19,9 @@ engine.py
     - 任一来源使 g 权重为 0 → 该组不出现
     - Melee Only 背景 → 远程组（Bow/Crossbow/Throwing/Ranged）权重强制 0
     - Tactician 无 base_prob（null）→ 仅靠权重规则合成
+    - 保证专属组（exclusive 配置 fixed/prob/mixed）概率由保证机制直接给出，覆盖类别骰组
+    - 骰组数 n 含小数 f → 有 f 概率多骰一次（Exclusive 基线 0.5 = 50% 骰 1 次，
+      使非保证但有正权重的专属组获得真实概率，v0.4.0）
 
 两种计算模式：
   - analytic（解析近似）：类别内按合成权重归一，P(出现)=1-(1-p)^n
@@ -341,14 +344,13 @@ class SkillEngine:
     # ------------------------------------------------------------------
 
     def num_rolls(self, bg_id: str, category: str) -> float:
-        """某类别骰组数 = 默认基线 + 背景修正，最小 0。"""
+        """某类别骰组数 = 默认基线 + 背景修正，最小 0。
+        可为小数：小数部分解释为「额外多骰一次」的概率（如 Exclusive 基线 0.5）。
+        """
         base: float = self.default_rolls.get(category, 0)
         bg: dict[str, Any] = self.gd.backgrounds.get(bg_id, {})
         mod: float = bg.get("group_rolls", {}).get(category, 0)
-        n: float = base + mod
-        if isinstance(n, float):
-            n = n  # Exclusive 基线 0.5 保留浮点
-        return max(0.0, n)
+        return max(0.0, base + mod)
 
     # ------------------------------------------------------------------
     # 专属组确定
@@ -437,10 +439,23 @@ class SkillEngine:
         顶层结果使用实例级缓存（带容量上限）；(mask, k) 子结果仅在单次调用内
         记忆化——它们依赖 target 与权重签名，跨调用不可复用，实例级存储只会
         无界膨胀内存。
+
+        分数骰组（v0.4.0）：n 含小数部分 f 时，解释为「有 f 的概率多骰一次」，
+        即 P = (1-f)·P(floor(n)) + f·P(floor(n)+1)。Exclusive 类别基线 0.5
+        由此获得真实语义（此前 int(round(0.5))=0 使非保证专属组恒为 0）。
         """
         if target not in weights_dict or weights_dict[target] <= 0:
             return 0.0
-        n_eff: int = int(round(n))
+        if n <= 0:
+            return 0.0
+        # 分数骰组拆分：f 概率骰 floor(n)+1 次，(1-f) 概率骰 floor(n) 次
+        n_low: int = int(n)
+        frac: float = n - n_low
+        if frac > EPS:
+            p_low: float = self._appear_prob_no_replacement(weights_dict, target, float(n_low)) if n_low > 0 else 0.0
+            p_high: float = self._appear_prob_no_replacement(weights_dict, target, float(n_low + 1))
+            return (1.0 - frac) * p_low + frac * p_high
+        n_eff: int = n_low
         if n_eff <= 0:
             return 0.0
         if len(weights_dict) == 1:
@@ -581,7 +596,9 @@ class SkillEngine:
         n: float = self.num_rolls(bg_id, cat)
         if n <= 0:
             return 0.0
-        n_int: int = int(round(n))
+        # 分数骰组：整数部分必骰，小数部分为「额外骰一次」的概率
+        n_low: int = int(n)
+        n_frac: float = n - n_low
 
         branches: list[tuple[list[str], float]] = self.resolve_exclusive(bg_id)
         # 归一化分支概率
@@ -617,11 +634,15 @@ class SkillEngine:
                     names.append(g)
             if not weights:
                 continue
-            # 无放回抽样 n_int 次
+            # 本次采样的骰组数：n_frac 概率多骰一次
+            n_rolls: int = n_low + (1 if (n_frac > EPS and rng.random() < n_frac) else 0)
+            if n_rolls <= 0:
+                continue
+            # 无放回抽样 n_rolls 次
             chosen: set[str] = set()
             w_copy: list[float] = list(weights)
             n_copy: list[str] = list(names)
-            for _k in range(min(n_int, len(n_copy))):
+            for _k in range(min(n_rolls, len(n_copy))):
                 if not n_copy:
                     break
                 tw: float = sum(w_copy)
