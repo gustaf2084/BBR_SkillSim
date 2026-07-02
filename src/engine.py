@@ -93,7 +93,10 @@ class SkillEngine:
     _all_groups: list[str]
     _forward_cache: dict[tuple, OrderedDict | None]
     _forward_cache_max: int
-    _norepl_cache: dict[str, dict[tuple[int, int], float]]
+    _norepl_cache: dict[tuple, float]
+    _norepl_cache_max: int
+    _bg_stars_cache: dict[str, dict[str, float]]
+    _bg_proj_cache: dict[str, dict[str, float]]
 
     def __init__(self, game_data: GameData) -> None:
         """
@@ -111,7 +114,12 @@ class SkillEngine:
         # 缓存层
         self._forward_cache: dict[tuple, OrderedDict | None] = {}     # key -> OrderedDict | None (analytic only)
         self._forward_cache_max: int = 200
-        self._norepl_cache: dict[str, dict[tuple[int, int], float]] = {}      # target: {bitmask_state: result}  for _appear_prob_no_replacement
+        # (target, 权重签名, n) -> 顶层出现概率；容量超限整体清空
+        self._norepl_cache: dict[tuple, float] = {}
+        self._norepl_cache_max: int = 50000
+        # 按背景缓存的天赋星期望 / 11 级投影属性（只依赖 bg_id，重算是纯浪费）
+        self._bg_stars_cache: dict[str, dict[str, float]] = {}
+        self._bg_proj_cache: dict[str, dict[str, float]] = {}
 
     # ------------------------------------------------------------------
     # 权重合成
@@ -185,15 +193,23 @@ class SkillEngine:
         weighted expectation: 0.6*1 + 0.3*2 + 0.1*3 = 1.5.
 
         Excluded attributes (talent_excluded_attributes per bg) return 0.0.
+
+        Result is cached per bg_id (pure function of static data).
         """
+        cached = self._bg_stars_cache.get(bg_id)
+        if cached is not None:
+            return cached
         bg = self.gd.backgrounds.get(bg_id)
         if not bg or not bg.get("attributes"):
-            return {a: DEFAULT_TALENT_STARS for a in self.gd.attribute_weights}
-        dist = self.gd.talent_star_distribution()
-        expected = sum(int(s) * p for s, p in dist.items())  # ≈ 1.5
-        excluded = self.gd.talent_excluded_attributes().get(bg_id, [])
-        return {a: (0.0 if a in excluded else expected)
-                for a in self.gd.attribute_weights}
+            result = {a: DEFAULT_TALENT_STARS for a in self.gd.attribute_weights}
+        else:
+            dist = self.gd.talent_star_distribution()
+            expected = sum(int(s) * p for s, p in dist.items())  # ≈ 1.5
+            excluded = self.gd.talent_excluded_attributes().get(bg_id, [])
+            result = {a: (0.0 if a in excluded else expected)
+                      for a in self.gd.attribute_weights}
+        self._bg_stars_cache[bg_id] = result
+        return result
 
     def _bg_projected_attrs(self, bg_id: str,
                             talent_stars: dict[str, float] | None = None
@@ -206,16 +222,27 @@ class SkillEngine:
         linearly interpolated by star count.
 
         Backgrounds with no attribute data fall back to DEFAULT_PROJECTED.
+
+        The default path (talent_stars=None) is cached per bg_id; explicit
+        talent_stars overrides bypass the cache.
         """
+        use_cache = talent_stars is None
+        if use_cache:
+            cached = self._bg_proj_cache.get(bg_id)
+            if cached is not None:
+                return cached
         bg = self.gd.backgrounds.get(bg_id)
         attrs = bg.get("attributes") if bg else None
         if not attrs:
-            return dict(DEFAULT_PROJECTED)
+            projected: dict[str, float] = dict(DEFAULT_PROJECTED)
+            if use_cache:
+                self._bg_proj_cache[bg_id] = projected
+            return projected
         if talent_stars is None:
             talent_stars = self._bg_expected_talent_stars(bg_id)
         lv_ranges = self.gd.talent_levelup_ranges()
         max_lv = self.gd.max_level  # 11
-        projected: dict[str, float] = {}
+        projected = {}
         for attr, (mn, mx) in attrs.items():
             base = (mn + mx) / 2.0
             stars = talent_stars.get(attr, 1.0)
@@ -228,6 +255,8 @@ class SkillEngine:
             per_level = avg_low + stars * per_star
             total_gain = per_level * (max_lv - 1)  # 10 level-ups
             projected[attr] = base + total_gain
+        if use_cache:
+            self._bg_proj_cache[bg_id] = projected
         return projected
 
     def compute_raw_weight(self, bg_id: str, trait_ids: list[str], group: str,
@@ -405,7 +434,9 @@ class SkillEngine:
           抽中非 target 组后，该组被移出，剩余权重重新归一。
           由于"抽中哪个非target组"会影响 target 后续权重占比，这里用按权重加权
           的期望更新（对 target 占比做一阶近似），在组数≤12、n≤5 时精度足够。
-        使用实例级缓存避免跨调用重复计算。
+        顶层结果使用实例级缓存（带容量上限）；(mask, k) 子结果仅在单次调用内
+        记忆化——它们依赖 target 与权重签名，跨调用不可复用，实例级存储只会
+        无界膨胀内存。
         """
         if target not in weights_dict or weights_dict[target] <= 0:
             return 0.0
@@ -423,18 +454,21 @@ class SkillEngine:
         if target_idx < 0:
             return 0.0
 
-        # 实例级记忆化：缓存键包含权重签名以避免不同调用间的碰撞
         cache_key: tuple = (target, tuple((n, round(w, 6)) for n, w in items), n_eff)
-        if cache_key in self._norepl_cache:
-            return self._norepl_cache[cache_key]
+        cached: float | None = self._norepl_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        # 单次调用内的 (mask, k) 记忆化
+        memo: dict[tuple[int, int], float] = {}
 
         def p_hit(mask: int, k: int) -> float:
             if k <= 0:
                 return 0.0
-            # 子结果存储在全局缓存中带前缀
-            full_key: tuple = cache_key + (mask, k)
-            if full_key in self._norepl_cache:
-                return self._norepl_cache[full_key]
+            key: tuple[int, int] = (mask, k)
+            hit: float | None = memo.get(key)
+            if hit is not None:
+                return hit
             idxs: list[int] = [i for i in range(len(names)) if (mask >> i) & 1]
             if not idxs:
                 return 0.0
@@ -450,11 +484,16 @@ class SkillEngine:
                 new_mask: int = mask & ~(1 << i)
                 p_miss_then_hit += pi * p_hit(new_mask, k - 1)
             result: float = p_target + p_miss_then_hit
-            self._norepl_cache[full_key] = result
+            memo[key] = result
             return result
 
         full_mask: int = (1 << len(names)) - 1
-        return p_hit(full_mask, n_eff)
+        top_result: float = p_hit(full_mask, n_eff)
+        # 容量上限：超限整体清空（单条重算成本低，无需精细 LRU）
+        if len(self._norepl_cache) >= self._norepl_cache_max:
+            self._norepl_cache.clear()
+        self._norepl_cache[cache_key] = top_result
+        return top_result
 
     def appear_prob_analytic(self, bg_id: str, trait_ids: list[str], group: str,
                              use_attribute: bool = True,
