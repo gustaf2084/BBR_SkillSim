@@ -1,0 +1,270 @@
+{
+  "Agile": {
+    "Tier 1": "Pathfinder\nAction Point costs for movement on all terrain is reduced by -1 to a minimum of 2 Action Points per tile, and Fatigue cost is reduced to half. Changing height levels also has no additional Action Point cost anymore.",
+    "Tier 2": "Anticipation\nTake reduced damage from the first 2 attacks you receive each battle.\nThis reduction is a percentage equal to your current Ranged Defense plus an additional 10% for each tile between the attacker and you.",
+    "Tier 4": "Death Dealer (requires Melee AOE Attack)\nMelee Area of Effect attacks gain +10% chance to hit and deal 10% increased damage.",
+    "Tier 5": "Footwork\nUnlocks the Footwork skill which allows you to leave a Zone of Control without triggering free attacks.\nGain Sprint.\n\nSprint\nAction Point cost for movement on all terrain is reduced by -1 and Fatigue cost increased by 100% until the end of your turn. \nCannot be used while Rooted.\nCost: 0 AP 10 Fat",
+    "Tier 6": "Head Hunter\nHitting the head of a target will give you a guaranteed hit to the head also with your next hit.\nConnecting with your hit will reset the effect.\nA miss does not reset the effect.",
+    "Tier 7": "Battle Flow\nOnce per turn, killing an opponent reduces current Fatigue by 10% of Base Maximum Fatigue (before penalties due to armor are applied)."
+  },
+  "Fast": {
+    "Tier 1": "Nine Lives\nOnce per battle, upon receiving a killing blow, survive instead with a few Hitpoints left and have all damage over time effects (e.g. Bleeding, Poisoned) cured.\nUpon triggering, gain increased attributes until your next turn.",
+    "Tier 2": "Quick Hands\nSwapping any item in battle becomes a free action with no Action Point cost once every turn.\nDoes not work when swapping a shield, or when swapping from one two-handed melee weapon to another two-handed melee weapon.",
+    "Tier 4": "Dynamic Duo\nAllows you to choose another member of your company as your partner. You will remain partners until one of you dies or leaves the company. You and your partner gain the following bonuses when there is no ally next to you or your partner.\nResolve and Initiative are increased by +20.\nGain +10 Melee Skill against enemies that attack your partner, and +10 Melee Defense against enemies attacked by your partner, for one turn.\nThe partner does not need to learn this perk in order to gain the benefits.\nGain the Shuffle skill.\n\nShuffle\nOnce per turn, switch places with your partner provided neither you nor your partner is stunned or rooted.\nCost: 0 AP 0 Fat",
+    "Tier 5": "Calculated Strikes\nDeal 20% more damage against anyone who has not started their turn yet in the current round.\nInitiative is reduced by 20%.",
+    "Tier 6": "Overwhelm\nWith every attack, hit or miss, against an opponent that acts after you in the current round, inflict the Overwhelmed status effect which lowers both Melee Skill and Ranged Skill by -10% for one turn.\nThe effect stacks with each attack, up to a maximum of 7 stacks, and can be applied to multiple targets at once with a single attack.",
+    "Tier 7": "Combo\nUsing any skill that costs Action Points reduces the Action Point cost of all other skills of this character by 1 to a minimum of 3.\nThis effect expires upon using any non-free skill, waiting or ending your turn."
+  },
+  "Tough": {
+    "Tier 1": "Colossus\nHitpoints are increased by 25%, which also reduces the chance to sustain debilitating injuries when being hit.",
+    "Tier 2": "Resilient\nAny negative status effect with a finite duration has its duration reduced to 1 turn. Status effects that have their effects grow weaker over several turns (e.g. Goblin Poison) are at their weakest state from the start.",
+    "Tier 3": "Taunt\nUnlocks the Taunt skill which makes the targeted opponent take offensive actions instead of defensive ones, and attack the taunting character over another, potentially more vulnerable one.\nWhen used on an adjacent target, reduce their Melee Defense and Ranged Defense by 20% of the user's Resolve.",
+    "Tier 5": "Vanquisher (requires Melee Attack)\nOnce per turn, immediately after killing an opponent, if you move into the tile of the killed target, the Action Point cost of the next skill used is halved. \nGain Gain Ground.\n\nGain Ground\nImmediately after killing an adjacent target, allows you to move into their tile ignoring Zone of Control with an Action Point cost equal to that of your starting tile reduced by -2 Action Points.",
+    "Tier 6": "Second Wind\nWhen you use 'Wait', recover Action Points until you have 4 Action Points",
+    "Tier 7": "Killing Frenzy\nA kill increases all Damage by 25% for 2 turns. Does not stack, but another Kill will reset the timer."
+  },
+  "Trained": {
+    "Tier 2": "Quick Hands",
+    "Tier 3": "Rotation\nUnlocks the Rotation skill which allows you to switch places with an adjacent allied character while ignoring Zone of Control.\nCannot be used if either character is Stunned, Rooted or otherwise disabled.\nCost: 3AP 20 Fatigue",
+    "Tier 4": "Vigilant\nAt the end of your turn, gain 1/2 of your remaining Action Points, rounded down, as extra Action Points during your next turn.",
+    "Tier 5": "Underdog\nThe defense malus due to being surrounded by opponents no longer applies to this character.\nIf an attacker has the Backstabber perk, the effect of that perk is negated, and the normal defense malus due to being surrounded is applied instead.",
+    "Tier 6": "Finesse\nFatigue Cost of skills is reduced by 20%.",
+    "Tier 7": "Weapon Master\nWhen you equip a Non-Hybrid Weapon whose perk group you have access to, gain the first, second, and third perk in that weapon's perk group if you have the corresponding perk in another weapon's perk group, regardless of its tier.\nWhen you equip a Hybrid Weapon whose perk group you have access to, gain the first and second perk in that perk group if you have the corresponding perk in another weapon perk group, regardless of its tier. If you have both weapon perk groups of your Hybrid Weapon only gain perks fom the alphabetically first perk group."
+  },
+  "Unstoppable": {
+    "Tier 1": "Adrenaline\nUnlocks the Adrenaline skill which puts you first in the turn order for the next round, to have another turn before your enemies do.\nWhile Adrenaline is active you cannot receive and are not affected by temporary injuries.\nCost: 1 AP 10 Fat",
+    "Tier 2": "Executioner\nDamage is increased by 20% against enemies who have sustained an injury or are sleeping, stunned, netted, webbed or rooted.",
+    "Tier 4": "The Rush of Battle\nWhenever you attack or are attacked, hit or miss, gain a stacking +5 Initiative and +5% reduction to the Fatigue cost of skills until the end of your next turn, up to a maximum of +25 and +25% respectively.\nStacks gained during each turn are tracked separately.",
+    "Tier 5": "Lone Wolf\nWhen no members of your faction are adjacent to you nor are there more than 1 within 2 tiles of distance from you, gain a +15% bonus to Melee Skill, Ranged Skill, Melee Defense, Ranged Defense, and Resolve.",
+    "Tier 6": "Unstoppable\nAs long as you have attacked at least once during your turn, if you end the turn with half or fewer of your Action Points remaining, gain a stack, up to a maximum of 5 stacks.\nEach stack increases Action Points by +1 and Initiative by +10.\nAll stacks are lost if you end your turn with more than half of your Action Points remaining, use Wait or Recover, or get Stunned, Rooted or Staggered."
+  },
+  "Vicious": {
+    "Tier 1": "Small Target\nAll attacks, melee or ranged, gain +10% chance to hit the head.",
+    "Tier 2": "Backstabber\nThe bonus to hitchance in melee is doubled to +10% for each ally surrounding and distracting your target.",
+    "Tier 3": "Between the Eyes (requires Melee Attack)\nUnlocks the Between the Eyes skill which can be used to perform your primary attack with an additional chance to hit the head equal to 50% of your Melee Skill.\nThe Action Point and Fatigue cost of your primary melee attack is added to the costs of this skill.\nCost: 1AP 10 Fat",
+    "Tier 4": "Battle Fervor\nResolve is increased by 10% at all times. Additionally, for positive morale checks, Resolve is increased by a further 10%.\nWhen at Confident Morale, all the bonuses of this perk are doubled, and Melee Skill, Ranged Skill, Melee Defense, and Ranged Defense are increased by 5%.",
+    "Tier 5": "Berserk\nOnce per turn, upon killing an enemy, 4 Action Points are immediately regained. Characters can not regain more than their maximum Action Points and no more than 4 for a single Attack.",
+    "Tier 7": "Fearsome\nThe damage threshold for triggering Morale Check with your attacks is reduced to 1.\nThese morale checks now have an additional penalty to Resolve of 20% of your Resolve."
+  },
+  "Vigorous": {
+    "Tier 1": "Survival Instinct\nWhenever you are attacked, gain a stacking bonus to Melee and Ranged Defense of +2 on a miss and +5 on a hit. This can stack up to 5 times for misses and up to 2 times for hits.\nAt the start of every turn, the bonus is reset except the bonus gained from getting hit which is retained for the remainder of the combat.",
+    "Tier 2": "Steel Brow\nHits to the head no longer cause critical damage to this character, which also lowers the risk of sustaining debilitating head injuries significantly.",
+    "Tier 3": "Fortified Mind\nResolve is increased by 25%.",
+    "Tier 4": "Decisive\nGain a stack whenever you end your turn without having used Wait, up to a maximum of 3 stacks.\nGain +15 Resolve and Initiative while you have at least 1 stack.\nSkills build up 15% less Fatigue while you have at least 2 stacks.\nDeal 15% additional damage while you have 3 stacks.\nYou lose all stacks if you use Wait.",
+    "Tier 6": "Fresh and Furious\nThe Action Point cost of the first skill that costs Action Points used every turn is halved.\nThe effect becomes disabled if you start a turn with 30% Fatigue built and remains disabled until you use Recover.",
+    "Tier 7": "Indomitable\n Unlocks the Indomitable skill which grants a 50% damage reduction and immunity to being stunned, knocked back or grabbed for one turn.\nIncrease damage by 25% after receiving a hit that lasts until your next attack or the end of your turn.\nCost: 5 AP 25 Fat"
+  },
+  "Tactician": {
+    "Tier 3": "Shield Sergeant\n Allies with a Shield will use Shieldwall for free at the start of each battle.\nAllies within 2 tiles will have the Action Point and Fatigue costs of their Shieldwall halved. Cannot reduce the Action Point cost below 2.\nIf you have the Shieldwall skill available, any ally who starts or ends their turn adjacent to you will use Shieldwall for free.\nOnly members of your company are considered allies for the purposes of this perk.",
+    "Tier 4": "Onslaught\nUnlocks the Onslaught skill, which allows you and nearby members of your company within 4 tiles who are not stunned, sleeping or fleeing to gain +10 Melee Skill, +20 Initiative and one use of the Linebreaker skill for one turn. This use of Linebreaker costs 1 less Action Point and builds 10 less Fatigue.\nCan only be used once per combat.\nCost: 7 AP 30 Fat",
+    "Tier 5": "Hold Steady\nUnlocks the Hold Steady skill, which allows you and other members of your company within 4 tiles, who are not stunned, sleeping or fleeing to gain +10 Melee Defense, +10 Ranged Defense and immunity to being stunned, knocked back or grabbed.\nCan only be used once per combat.\nCost: 7AP 30 Fat",
+    "Tier 7": "Blitzkrieg\nYou and allies of your faction within 4 tiles who have at least 10 Fatigue remaining and are are not stunned, sleeping or fleeing gain the Adrenaline effect and build 10 fatigue.\nUsable once per day combat and cannot be used by more than one character.\nCost: 7AP 30 Fat"
+  },
+  "Knave": {
+    "Tier 1": "Trickster's Purses\nUnlock 2 extra bag slots.\nUnlocks the Throw Pocket Sand skill which allows you to store sand in your empty bag slots with which to distract nearby enemies, reducing Damage and Initiative by 35%.",
+    "Tier 2": "Cheap Trick (requires Melee Attack)\nUnlocks the Cheap Trick skill which increases the chance to hit of your next attack by +25% but reduces the damage by 50%.\nCost: 0 AP 10 Fat",
+    "Tier 4": "Ghostlike\n(requires total armor weight up to 20)\nWhen the number of adjacent allies is greater than or equal to the number of adjacent enemies, you may ignore Zone of Control for your next movement action.\nWhen wielding a melee weapon with up to 4 Reach, when you end your movement adjacent to an enemy, the next attack against that enemy deals 25% more damage and +20% damage ignoring armor. This bonus expires upon taking any action other than an attack."
+  },
+  "Laborer": {
+    "Tier 1": "Fruits of Labor\nHitpoints and Maximum Fatigue are increased by 10% of their respective base values.",
+    "Tier 5": "Wears it Well\nThe penalty to Maximum Fatigue and Initiative from equipped items in your head, body mainhand and offhand slots is reduced by 20%.\nThis effect stacks with Brawny."
+  },
+  "Militia": {
+    "Tier 1": "Phalanx",
+    "Tier 2": "Strength In Numbers\nGain +2 Melee Skill, Ranged Skill, Melee Defense and Ranged Defense, as well as +5 Resolve for every adjacent ally."
+  },
+  "Noble": {
+    "Tier 1": "Family Pride\nAlways start battles at Confident morale. \nResolve is increased by 50% against negative morale checks.\nRemoves the Insecure and Dastard traits upon being picked.",
+    "Tier 5": "Command"
+  },
+  "Pauper": {
+    "Tier 1": "Promised Potential\nUpon reaching level 11, this perk has a 50% chance of being replaced with Realized Potential which will double this character's salary, increase all attributes by +15, add 1 Shared and 2 Weapon perk groups and refund all Perk Points, including the one spent on this Perk.\nIf unsuccessful, this perk is replaced by Failed Potential which does nothing."
+  },
+  "Raider": {
+    "Tier 1": "Menacing\nLower the Resolve of adjacent enemies by -10.",
+    "Tier 2": "Bully (requires Melee Attack)\nAttacks against characters with a lower morale than you deal 10% more damage per level of morale difference."
+  },
+  "Soldier": {
+    "Tier 2": "Exude Confidence\nAt the start of your turn,if you have at least Steady morale, improve the morale state of adjacent allies by 1 as long as their Morale state is lower than yours.",
+    "Tier 5": "Pattern Recognition\nEvery time an opponent attacks you in melee or you attack an opponent, gain a stacking +3 Melee Skill and Melee Defense against that opponent for the remainder of the combat.\nOnce the total bonus reaches 15, all subsequent attacks increase it by +1 only."
+  },
+  "Swordmaster": {
+    "Tier 1": "Blade Dancer (requires Sword)\nGain Initiative equal to the armor ignore percentage of your equipped sword.\nWhen using a non-fencing sword, the Action Point cost of non-AOE skills is reduced by -1 and these skills build up 25% less Fatigue.\nAllows Kata Step to be usable even while holding something, e.g. a shield, in your offhand.\nKata Step costs 2 fewer Action Points and builds 2 less Fatigue, both down to a minimum of 0.",
+    "Tier 2": "Juggernaut (requires Two Handed Non-Fencing Sword)\nUnlocks the Juggernaut Charge skill which immediately provides the Indomitable effect that lasts until your next turn and moves you up to 2 tiles away. After moving, attack a random adjacent enemy with 50% more damage and stagger all adjacent enemies.\nCannot be used when engaged in melee and can only target tiles with 1 level of height difference.\nCost: 5 AP 25 Fat",
+    "Tier 3": "Metzger (requires Sword)\nGain the Decapitate skill with swords.\nGain all the perks of the Cleaver perk group when using a sword. Swords now additionally qualify as Cleavers for the purposes of these perks.\nCutting attacks from swords inflict Bleeding as if they were Cleavers.",
+    "Tier 4": "Precise (requires Sword)\nGain +1 Melee Skill and Melee Defense and +1% additional damage ignoring armor per character level.\nWhile wielding a fencing type sword an additional 25% of damage ignores armor.",
+    "Tier 5": "Reaper (requires Sword)\nThe Action Point costs of AOE sword skills is reduced by 2 and the Fatigue cost by 10%.",
+    "Tier 6": "Versatile Swordsman (requires Sword)\nUnlocks three stances which can be switched to during combat for 3 Action Points and 1 Fatigue to gain different effects that last as long as the stance is kept. Always begin combat in the Meisterhau stance.\n\nMeisterhau (requires Two-Handed or Double-Gripped One-Handed Sword) Triggering En Garde no longer requires any remaining Fatigue. Gain the Kick, Push Through and Tackle skills.\n\nHalf Swording (requires Two-Handed or a One-Handed Sword with Offhand free)\nRemoves all attack skills from the currently equipped sword and adds the Stab and Puncture skills. The Stab skill deals 50% reduced damage.\nLose half of your weapon's Reach.\n\nReverse Grip\nSwords gain the Mace tag.\nRemoves all attack skills from the currently equipped sword and adds the Bash and Knockout or Cudgel and Strike Down skills for one-handed or two-handed swords respectively.\nLose one-third of your weapon's reach.\nGain the Concussive Strikes perk when a Sword is equipped.",
+    "Tier 7": "Kick\nStagger and perform a free basic attack against a targeted adjacent enemy. If the attack is successful, the target is pushed back a tile and loses the Shieldwall, Spearwall and Riposte effects.\nCost: 6 AP 15 Fat\n\nPush Through\nStagger and perform a free basic attack against a targeted adjacent enemy. If the attack is successful, automatically use Line Breaker for free on the target.\nCost: 6 AP 15 Fat\n\nTackle (requires Two-Handed or a One-Handed Sword with the Offhand Free)\nPerform a free basic attack against a targeted adjacent enemy. If the attack is successful, stun and exchange positions with the target.\nCost: 6 AP 15 Fat"
+  },
+  "Trapper": {
+    "Tier 3": "Angler (requires Throwing Net)\nEnemies netted by you have a 50% increased Action Point cost for using the Break Free skill.\nGain Net Pull when wielding a Throwing Net.\n\nNet Pull (requires Throwing Net)\nPull a target from 2 tiles away with a max height difference of 1 if there is an open tile next to you, expending your net to net and stagger them. Shieldwall, Spearwall and Riposte will be canceled for a successfully pulled target. A rooted target can not be pulled.",
+    "Tier 4": "Offhand Training",
+    "Tier 5": "Kingfisher (requires Throwing Net)\nWhile wielding a net, every successful melee attack against an adjacent target has a chance to net the target without expending your currently held net. The chance is equal to the hit chance of the attack.\nYou cannot use or swap this net until the target breaks free or dies. If you move more than 1 tile away from the target, the target remains netted but you lose the net.\nThis net effect can be broken out of with 100% effectiveness.\nGain +2 Reach while holding a net and not currently netting a target."
+  },
+  "Wildling": {
+    "Tier 1": "Pathfinder",
+    "Tier 2": "Bestial Vigor\nUnlocks the Bestial Vigor skill which can be used once per combat to reduce current Fatigue by 50% and gain +3 Action Points for this turn.\nCost: 0 AP, 0 Fat",
+    "Tier 5": "Savage Strength\nThe Fatigue cost of weapon skills is reduced by 25%.",
+    "Tier 6": "Feral Rage (requires Melee Attack)\nGain stacking rage during combat. You gain 1 stacks for getting hit, 3 for killing a target, and 2 for every successful hit against an adjacent target. You lose 3 rage at the start of every turn. Each stack of rage increases Resolve and Initiative by +2 and Damage by 2%, lowers Melee Defense by -1 and reduces incoming Damage by 2% to a maximum of 70%."
+  },
+  "Axe": {
+    "Tier 2": "Dismantle (Cutting Attack with Axe)\nEvery successful hit has a chance to apply the Dismantled Armor effect, which causes the target to receive a stacking +20% damage received ignoring armor on the body part hit for the remainder of the combat.\nThe chance is equal to the ratio of armor damage inflicted to remaining armor on the body part hit.",
+    "Tier 4": "Axe Mastery\nSkills build up 25% less Fatigue.\nRound Swing gains +5% chance to hit.\nThe Longaxe and Poleaxe no longer have a penalty for attacking targets directly adjacent.\nGain Bearded Blade and Hook Shield.\n\nBearded Blade (requires Axe)\nYour next attack has a chance to Disarm the target equal to your Hitchance. Until your next turn any opponent who misses an attack against you in melee has a chance equal to the miss chance to be Disarmed. The effect expires after your next attack, a successful Disarm or swapping your weapon.\nCost: 3 AP 15 Fat\n\nHook Shield (requires Axe)\nTarget a shielded enemy with your base hitchance that ignores the Melee Defense bonus of the shield.\nRemove Shieldwall, otherwise reduce the Melee Defense and Ranged Defense granted by shields by 75%.\nRemoves Riposte and disables Rebuke.\nIf used on the same target twice in a turn, the second use refunds all of its Action Point cost if successful.\nThe effect expires upon using any skill or starting a new turn.\nCost: 3 AP 25 Fat",
+    "Tier 6": "Dismemberment (Cutting Attack with Axe)\nWhen inflicting an injury with an attack, if you meet the threshold for the lowest possible injury, instead inflict one with the highest threshold.\nThis injury triggers at least one additional morale check on the target and can trigger up to 3 morale checks, one for every 33% Hitpoints damage dealt compared to remaining Hitpoints."
+  },
+  "Bow": {
+    "Tier 1": "Target Practice (requires Bow)\nRanged attacks gain +10% chance to hit against enemies wielding ranged weapons or enemies not in cover.",
+    "Tier 4": "Bow Mastery\nSkills build up 25% less Fatigue. \nView range and maximum shooting range with bows is increased by +1.\nGain Arrow to the Knee.\n\nArrow to the Knee (requires Bow)\nOn a successful hit, require the target to spend 2 additional Action Points per tile moved for 2 turns. Has -10% chance to hit, an additonal -4% chance to hit per tile of distance and no chance to hit the head.\nCost: 4 AP 20 Fat",
+    "Tier 7": "Trick Shooter\nGain Hip Shooter and Flaming Arrows.\n\nHip Shooter (requires Bow)\nThe Action Point cost of Quick Shot is reduced by 1 but each subsequent Quick Shot builds 10% more Fatigue.\n\nFlaming Arrows (requires Bow)\nUse an Aimed Shot with -2 range that additionaly deals Fire damage, +10% armor penetrating damage and ignites the tile the arrow lands on for 2 rounds. If it hits the target, it triggers a Morale Check for the target and adjacent enemies. Has a -10% chance to hit and an additional -4% per tile of distance.\nConsumes 2 ammo.\nCost: 7 AP 20 Fat"
+  },
+  "Cleaver": {
+    "Tier 2": "Sanguinary (Cutting Attack with Cleaver)\nThe first 2 fatalities during your turn instantly restore 3 Action Points each.\nCan only trigger once per attack.",
+    "Tier 4": "Cleaver Mastery\nSkills build up 25% less Fatigue. \nAttacks from Cleavers apply an additional stack of Bleed on targets. \nDisarm only has half the penalty to hit.\nGouge has a 50% lower threshold to inflict injuries.\nGain the Bloodlust perk.\n\nBloodlust (requires Cleaver)\nAfter inflicting a fatality, gain 2 stacks of Bloodlust, up to a maximum of 2 stacks.\nFor each stack, Resolve, Initiative and Fatigue Recovery rate are increased by +15%.\nYou lose 1 stack at the start of every turn.",
+    "Tier 6": "Mauler (Cutting Attack with Cleaver)\nAttacks from cleavers apply an additional stack of Bleeding on the target.\nWhen attacking a target which already has at least 3 stacks of Bleeding, you have a 33% chance to apply an injury. If the attack already applied an injury, this applies an additional injury."
+  },
+  "Crossbow": {
+    "Tier 1": "Steady Brace (requires Crossbow or Firearm)\nIf you have not moved from your position during your turn, ranged attacks from crossbows have +10% armor penetration and those from firearms have +10% chance to hit.",
+    "Tier 4": "Crossbow Mastery\nSkills build up 25% less Fatigue.\nHeavy crossbows now require 4 Action Points to reload just like regular crossbows, allowing you to shoot, reload and move.\nHandgonnes now require 6 Action Points to reload and can be fired every turn instead of every other turn.\nGain Take Aim.\n\nTake Aim (requires Crossbow or Firearm)\nFor the next ranged attack:\nCrossbows ignore any Hitchance Penalty from obstacles and the shot cannot go astray.\nHandgonnes have their Maximum Range increased by 1 and if used at a shorter range, have their Area-of-Effect is increased by 1 instead.\nCost: 2 AP, 25 Fat",
+    "Tier 5": "Iron Sights (requires Crossbow or Firearm)\nCrossbows and Firearms gain an additional +25% chance to hit the head.\nHeadshots from firearms apply the Shellshocked effect except on characters that ignore morale."
+  },
+  "Dagger": {
+    "Tier 1": "Between the Ribs (Piercing Attack with Dagger)\nAttacks against surrounded targets deal 10% more damage and have 10% more armor penetration per ally surrounding the target.",
+    "Tier 4": "Dagger Mastery\nSkills build up 25% less Fatigue.\nAttacks from daggers against targets who act after you in the current round ignore all of the target's reach advantage.\nStab, Puncture and Deathblow have a reduced Action Point cost to allow for an additional attack each turn.",
+    "Tier 7": "Swift Stabs (Piercing Attack with Dagger)\nA successful attack with your mainhand dagger reduces the Action Point cost of all its skills by 2 to a minimum of 2 for the remainder of this turn.\nThe effect expires upon missing an attack, switching your weapon, switching the target, killing the target, or using any skill that is not a dagger attack."
+  },
+  "Flail": {
+    "Tier 2": "Whirling Death (requires Flail)\nEvery attack with flails increases your current Reach by +1 until your next turn.\nWith two-handed flails, when attacking a target who has lower current Reach than you, gain +10% chance to hit the head per difference in current Reach between you and the target.\nDuring your turn when attacking with one-handed flails, perform a free extra attack with 50% less damage against a different adjacent enemy who has lower current Reach than you. This extra attack does not increase your Reach.\nDoes not take into account abilities which ignore or modify Reach during an attack.",
+    "Tier 4": "Flail Mastery\nSkills build up 25% less Fatigue.\nLash and Hail ignore the defense bonus of Shields. \nPound ignores an additional +10% of armor on head hits.\nThresh gains +5% chance to hit.\nPoleflails no longer have a penalty for attacking targets directly adjacent.\nGain From All Sides.\n\nFrom all Sides (requires Flail)\nSuccessful hits from Flails progressively reduce the target's Melee Defense and Ranged Defense by a stacking -5 for one turn.\nThe effect is doubled if the attacks hit the head.",
+    "Tier 7": "Flail Spinner (requires Flail)\nDuring your turn, attacks have a 50% chance to perform a free extra attack of the same type with 50% reduced damage."
+  },
+  "Hammer": {
+    "Tier 3": "Rattle (Blunt Attack with Hammer)\nOn a successful attack, apply the Rattled effect for 1 turn, reducing the target's reach by -3.",
+    "Tier 4": "Hammer Mastery\nSkills build up 25% less Fatigue.\nDestroy Armor and Demolish Armor inflict 33% more Damage against armor and apply the Dented Armor effect.\nShatter gains +5% chance to hit.\nThe Polehammer no longer has a penalty for attacking targets directly adjacent.\nTwo-handed hammers gain the Pummel skill.\n\nDent Armor (requires Blunt Damage with Hammer)\nIf the armor hit with an attack has a Max Condition of 210 or greater, reduce Melee and Ranged Skill by 10% and Damage by 20%.\nThis lasts the entire combat or until the target or thier ally uses Adjust Dented Armor. \n\nPummel (requires Two Handed Hammer)\n Attack an enemy with your Hammer's basic attack. A successful hit knocks back and staggers the target.\nMove onto the tile the target previously occupied.\nCannot be used while Rooted.\n 6 AP 25 Fat",
+    "Tier 6": "Deep Impact (Blunt Attack with Hammer)\nPerform your primary attack on the target as if it has a base cost of 30 fatigue. If successful, reduce their damage output by a percentage equal to the ratio of Hitpoints damage received to current Hitpoints, up to a maximum of 50%."
+  },
+  "Mace": {
+    "Tier 2": "Concussive Strikes (Blunt Attack with Mace)\nHits to the head with one-handed maces stun for 1 turn if the target is already dazed or if the attack inflicts dazed. Otherwise inflict dazed for 1 turn instead.\nHits to the head with two-handed maces stun the target for 1 turn.",
+    "Tier 4": "Mace Mastery\nSkills build up 25% less Fatigue. \nKnock Out, Knock Over and Strike Down have a 100% chance to Stun the target if not immune. \nThe Polemace no longer has a penalty for attacking targets directly adjacent.\nGain Bear Down.\n\nBear Down (requires Mace)\nGain +15% chance to hit the head and a 33% reduction to injury threshold when attacking a Rattled, Stunned, Dazed, Netted, Sleeping, Staggered, Webbed or Rooted enemy.",
+    "Tier 7": "Bone Breaker (Blunt Attack with Mace)\nAttacks that do at least 5 damage to Hitpoints and apply a valid status effect or are against characters with a valid status effect have a chance to inflict an injury. This chance is 100% for two-handed maces and 50% for one-handed maces.\nIf the damage was sufficient to inflict an injury it inflicts an additional injury.\nIn a single turn, cannot trigger more than once on the same target.\nValid status effects include: Stunned, Netted, Webbed, Rooted, Sleeping."
+  },
+  "Polearm": {
+    "Tier 3": "Leverage (Weapon with a Max Range of 2 tiles)\nWhen attacking a target at a range of 2 tiles, gain +20% chance to hit the head.",
+    "Tier 4": "Polearm Mastery\nSkills build up 25% less Fatigue.\nAll skills with two-handed weapons, with a range of 2 tiles, having an Action Point cost of 6 have their Action Point cost reduced to 5.\nPolearms no longer have a penalty for attacking targets directly adjacent.\nGain Bolster.\n\nBolster (requires weapon with 6 or more Reach)\nWhen not engaged in melee, whenever you attack, hit or miss, trigger a Positive Morale Check for adjacent members of your company.",
+    "Tier 7": "Long Reach (requires Polearm)\nEnemies within 2 tiles are considered surrounded by you for the purposes of hit-chance bonus for any allies attacking that target."
+  },
+  "Spear": {
+    "Tier 3": "Through the Gaps (Piercing Attack with Spear)\nAttacks have a random +10% to +25% armor penetration.",
+    "Tier 4": "Spear Mastery\nSkills build up 25% less Fatigue.\nSpearwall is no longer disabled once an opponent manages to overcome it. Instead, Spearwall can still be used and continues to give free attacks on any further opponent attempting to enter the Zone of Control.\nWhen starting your turn with a spear equipped and not moving more than 1 tile from your position, the first piercing spear attack during your turn costs no Action Points and builds 50% less Fatigue.\nThe Spetum and Warfork no longer have a penalty for attacking targets directly adjacent.",
+    "Tier 7": "King of all Weapons (Piercing Attack with Spear)\nAttacks have a chance equal to 66% of your current Melee Skill to target the body part with the lower armor."
+  },
+  "Sword": {
+    "Tier 3": "Tempo (requires Sword)\nGain 1 stack for every hit or miss against any target during your turn.\nEach stack increases your Initiative by +15. This bonus is carried over into your next turn but only until the first skill used or upon waiting that turn.\nDuring a turn gain half of the stacks gained during the previous turn as additional Action Points and attacks build up 5% less Fatigue per such stack.",
+    "Tier 4": "Sword Mastery\nSkills build up 25% less Fatigue.\nRiposte no longer has a penalty to hitchance.\nGash has a 50% lower threshold to inflict Injuries.\nSplit and Swing no longer have a penalty to hitchance and gain +5% chance to hit.\nGain Passing Step\n\nPassing Step\n(requires a cutting attack from a two-handed or double-gripped sword)\nImmediately after a successful attack, allows you to move one tile ignoring Zone of Control with -2 Action Point and +2 Fatigue cost (based on starting tile).\nThe target tile for the movement must be adjacent to an enemy.",
+    "Tier 7": "En Garde (requires Sword)\nThe double grip bonus for southern swords is not disabled when using an offhand item with less than 10 weight.\nUse Riposte freely at the end of your turn if your weapon has Riposte. If your weapon does not have Riposte and is two-handed, gain the Rebuke effect instead for one turn, with an additional chance of 15% for returning a missed attack. The attacks triggered from this Rebuk do not build Fatigue.\nThis perk only triggers if you have at least 15 Fatigue remaining, but does not cost any Action Points and does not build any Fatigue."
+  },
+  "Throwing": {
+    "Tier 3": "Hybridization\nGain 10% of your Ranged Skill as additional Melee Skill and Melee Defense.\nThrowing attacks gain 20% of your current Melee Skill as additional chance to hit.\nCan switch to or from a throwing weapon for free once per turn.",
+    "Tier 4": "Throwing Mastery\nSkills build up 25% less Fatigue.\nDamage is increased by 30% when attacking at a distance of 2 tiles and by 20% when attacking at a distance of 3 tiles.\nHits from throwing attacks now apply certain debuffs on the target. Piercing type attacks have a 50% chance to inflict the Arrow to the Knee effect. Cutting type attacks always apply the Overwhelmed effect. Blunt type attacks have a 50% chance to inflict staggered and if the target is already staggered, 100% chance to inflict stunned.",
+    "Tier 5": "Opportunist (requires Throwing Weapon)\nThe first 2 Throwing attacks during a battle have their Action Point costs halved. This effect only lasts until the end of your second turn.\nWhen using a throwing weapon which uses ammo, whenever you end your movement over an enemy's corpse during your turn, recover 1 ammo. Immediately afterward, the next throwing attack costs no Action Points and builds 50% less Fatigue.\nA corpse can only be used once per combat and cannot be used by multiple characters with this perk."
+  },
+  "Heavy Armor": {
+    "Tier 3": "Brawny\nThe fatigue and initiative penalty from wearing armor and helmet is reduced by 30%.",
+    "Tier 5": "Bulwark\nGain 5% of your combined current head and body armor durability as additional Resolve. This bonus is doubled against negative Morale Checks except mental attacks.",
+    "Tier 6": "Battleforged\nArmor damage taken is reduced by a percentage equal to 5% of the current total armor value of both body and head armor.\nWhen attacking a target against whom you have a Reach Disadvantage, reduce this disadvantage by 1 for every 300 current combined head and body armor durability you have.\nDoes not affect damage from mental attacks or status effects.\nCannot be learned if you have Nimble or Poise."
+  },
+  "Light Armor": {
+    "Tier 2": "Relentless\nAt all times your Initiative is reduced only by 50% of your accumulated Fatigue, instead of all of it. In addition, using the Wait command will no longer give you a penalty to Initiative in the next round.",
+    "Tier 3": "Dodge\nGain 15% of the character's current Initiative as a bonus to Melee and Ranged Defense.",
+    "Tier 6": "Nimble\nDamage to Hitpoints is reduced by 50% and that to armor by 25%.\nThe bonus drops exponentially when wearing head and body armor with a total penalty to Maximum Fatigue above 15% of your Base Fatigue including traits and permanent injuries. This perk will always provide the full bonus when wearing head and body armor with a total penalty to Maximum Fatigue of 15 or below.\nDoes not affect damage from mental attacks or status effects, but can help to avoid receiving them.\nWhen attacking a target against whom you have a Reach Disadvantage, reduce this disadvantage by 1 if your Initiative is greater than that of your target.\nBrawny does not affect this perk.\nCannot be learned if you have Poise or Battleforged."
+  },
+  "Medium Armor": {
+    "Tier 2": "Skirmisher\nReduces the penalty to Initiative from head and body armor by 30% and at all times your Initiative is reduced only by 50% of your accumulated Fatigue, instead of all of it.",
+    "Tier 3": "Dodge\nGain 15% of the character's current Initiative as a bonus to Melee and Ranged Defense.",
+    "Tier 6": "Poise\nDamage to Hitpoints is reduced by 30% and to armor by 20%.\nThe bonus drops exponentially when wearing head and body armor with a total penalty to Maximum Fatigue above 30% of your Base Fatigue including traits and permanent injuries. This perk will always provide the full bonus when wearing head and body armor with a total penalty to Maximum Fatigue of 35 or below.\nDoes not affect damage from mental attacks or status effects, but can help to avoid receiving them.\nWhen attacking a target against whom you have a Reach Disadvantage, reduce this disadvantage by 1 if your Initiative is greater than that of your target.\nBrawny does not affect this perk.\nCannot be learned if you have Nimble or Battleforged."
+  },
+  "Swift": {
+    "Tier 1": "Fast Adaptation\nGain an additional stacking +10% hitchance with each attack that misses an opponent. Bonus is reset upon landing a hit.",
+    "Tier 2": "Vigorous Assault",
+    "Tier 4": "Offhand Training \n(requires Offhand Item weighing less than 10)\nOnce per turn, the first use of your offhand item weighing less than 10 costs no Action Points.\nGain Trip Artist when wielding a net.\n\nTrip Artist (requires Throwing Net)\nThe first melee attack every turn against an adjacent target will apply the staggered effect on a hit.\nWhen wielding a weapon with a Reach of less than 4, gain the difference in Reach up to 4.",
+    "Tier 5": "Double Strike (requires Melee Attack)\nA successful hit increases the damage of your next attack by 20%.\nThe effect is lost upon moving, swapping an item, using any skill except a single-target attack, missing an attack, or waiting or ending your turn.",
+    "Tier 6": "Duelist\n(requires Weapon whose primary melee attack has a Base Action Point cost of 4 or less) \nAdditional damage ignores armor. This bonus is 25% for one-handed weapons, 35% for one-handed weapon with shield, and 15% for two-handed weapons.\nShields now also negate the Reach Advantage of the target when attacking."
+  },
+  "Power": {
+    "Tier 1": "Crippling Strikes\nLowers the threshold to inflict Injuries by 33% for both Melee and Ranged Attacks.  Attacks can now inflict Injuries on Undead.",
+    "Tier 2": "Vigorous Assault (requires Melee or Throwing Attack)\nFor every 2 tiles moved, the Action Point cost of your next attack is reduced by 1 to a minimum of 1, and the Fatigue cost is reduced by 10%.\n                                The bonus is lost upon waiting or ending your turn, using any skill, or swapping your weapon except to or from a throwing weapon.",
+    "Tier 3": "Rotation",
+    "Tier 5": "Sweeping Strikes (requires Melee AOE Attack)\nArea of Effect attacks, hit or miss, increase your Reach by +3. Additionally, the targeted enemies' Reach is reduced by -3 for their attacks against you.\nThe effect does not stack and lasts until the start of your next turn.",
+    "Tier 7": "Formidable Approach\nGain +1 Reach. \nThe bonus from each point of Reach Advantage you have is increased by +2, without diminishing returns, against enemies in your Zone of Control until they hit you. After being hit this effect expires, but is reset if the Zone of Control is broken."
+  },
+  "Ranged": {
+    "Tier 2": "Entrenched (requires Ranged Weapon)\nWhen standing adjacent to an ally wielding a melee weapon who is not engaged in melee, gain +7 Ranged Skill, Ranged Defense, and Resolve. The bonus increases by +2 every turn up to a maximum of +15 as long as you continue to start your turn adjacent to any ally wielding a melee weapon who is not engaged in melee.",
+    "Tier 3": "Bullseye (requires Ranged Weapon)\nThe penalty to hitchance when shooting at a target you have no clear line of shooting to is reduced from 75% to 50%.\nAgainst targets who are not in cover, gain 10% armor penetration when using a bow and 20% otherwise.",
+    "Tier 5": "Nailed It (requires Ranged Attack)\nGain +25% chance to hit the head at a distance of 2 tiles. For every tile beyond that, this bonus is reduced by -5%.\nThe penalty to hitchance from obstructed line of sight is reduced by 50% at a distance of 2 tiles.",
+    "Tier 6": "Overwhelm"
+  },
+  "Shield": {
+    "Tier 1": "Exploit Opening\nWhenever an opponent misses a Melee attack against you, gain +10% chance to hit against them, or ignore their shield, whichever is greater, for your next attack.",
+    "Tier 2": "Phalanx (Two-Handed Weapon with Piercing Attack, or Shield)\nWhen attacking or defending in melee, gain +1 Reach per adjacent ally who is wielding a two-handed weapon with a piercing attack or a shield.\nIgnore the defense malus from being surrounded by enemies up to the number of such adjacent allies. This includes enemies with the Backstabber perk.",
+    "Tier 3": "Shield Expert (Requires Shield)\nThe shield defense bonus is increased by 25%. This also applies to the additional defense bonus of the Shieldwall skill.\nThe drop in shield defense bonus at maximum Fatigue is reduced from 50% to 25%.\nMissed attacks against you no longer increase your Fatigue.\nGain Cover Ally.\n\nCover Ally\n Cover an adjacent ally, allowing them to move 1 tile ignoring Zone of Control on their turn.\nIf the target stays adjacent to you until the start of the next round, their turn order is calculated with +5000 Initiative.\nCost: 4 AP 20 Fatigue",
+    "Tier 4": "Line Breaker (Requires Shield)\nThe Knockback skill gains +15% chance to hit.\nGain Shield Bash and Linebreaker.\n\nShield Bash\nDaze a target on hit.\nHas a +25% chance to hit.\nCost: 4AP 15 Fat\n\nLinebreaker\nKnock back an enemy, inflict 10 Fatigue and take their place, all in one action.\nCost: 4 AP 20 Fat",
+    "Tier 5": "Rebuke\nGain the Rebuke effect during combat which grants a 25% chance to perform an attack against an adjacent opponent who misses a melee attack against you. This attack costs no Action Point but can only trigger if you have enough Fatigue to afford it. A resolve check is triggered for you, and if successful, the attack builds no Fatigue.\nWhen wielding a shield, the chance is increased by an additional +15% and the attack does not build or require any Fatigue.",
+    "Tier 6": "Duelist"
+  },
+  "Back To Basics": {
+    "Tier 2": "Back to Basics\nGain 2 Perk Points.\nDrop your perk tier down to 2.",
+    "Tier 4": "Return Favor (effect)",
+    "Tier 5": "Return Favor (requires Melee Weapon or Unarmed)\nUnlocks the Return Favor skill which when active has a 10% chance to stun, 50% chance to daze and 75% chance to stagger any opponent missing a melee attack against this character.\nImmunities and resistances against being stunned still apply."
+  },
+  "Discovered Talent": {
+    "Tier 2": "Discovered Talent\nEvery time you spend a level-up, gain between 1 and 3 talent stars in a random attribute in which you have fewer than 3 stars.\nCan only trigger once per attribute and cannot increase the number of talent stars in an attribute beyond 3.",
+    "Tier 4": "Deep Cuts",
+    "Tier 5": "Deep Cuts (requires Cutting Damage)\nDuring your turn, after a successful attack against a target, all subsequent attacks have a 33% reduced threshold to inflict injury and will inflict Bleeding. If any of the attacks inflicted an injury, the attacks inflict additional Bleeding.\nThe effect expires upon switching your target, moving, swapping an item, waiting or ending your turn, or using any skill except a cutting attack."
+  },
+  "Fencer": {
+    "Tier 2": "Fencer (requires Fencing Sword)\nSkills build up 20% less Fatigue and gain +10% chance to hit.\nThe Damage Type requirement from Kata Step is removed.\nWhen using a one-handed fencing sword, the Action Point costs of Sword Thrust, Riposte and Lunge are reduced by 1.\nWhen using a two-handed fencing sword, the range of Lunge is increased by 1 tile.",
+    "Tier 4": "Soul Link",
+    "Tier 5": "Soul Link\nAll incoming damage to Hitpoints is reduced by 40%. Hitpoint damage reduced is transferred to a random adjacent ally.\nAllies with Soul Link cannot be the target of this ability."
+  },
+  "Gifted": {
+    "Tier 2": "Gifted\nInstantly gain a levelup to increase this character's attributes with maximum rolls, but without talents.",
+    "Tier 4": "Follow Up",
+    "Tier 5": "Follow Up (requires Two-Handed Melee Weapon)\nUnlocks the Follow Up skill, which while not engaged in Melee allows you to do a free attack with -30% Damage against enemies in your attack range who are successfully hit by your allies until your next turn. Adds -10% to the Damage Reduction for each attack, up to a maximum of -90%.\nCost: 4 AP 30 Fat"
+  },
+  "Leadership": {
+    "Tier 1": "Supporter\nOnce per turn, after you use a skill targeting an adjacent ally, recover 3 Action Points.\nGain Encourage.\n\nEncourage\n Trigger a positive morale check for an ally within 2 tiles with a bonus of 50% of your Resolve.\nCan only be used on characters who are of your faction and whose morale is lower than yours per tile of distance they are away.\nCannot be used on fleeing or stunned targets.\nOnly usable once per turn.\nCost: 4 AP 15 Fat",
+    "Tier 2": "Rally the Troops\nTriggers a morale check to raise the morale of anyone of your faction who is wavering or worse within 4 tiles distance, with a bonus to Resolve of 40% of your Resolve. The bonus is lowered by -10 per tile distance except for Fleeing targets.\nRemoves the Sleeping status effect on allies within range.\nCost: 5 AP, 25 Fat",
+    "Tier 3": "Fortified Mind",
+    "Tier 4": "Polearm Mastery",
+    "Tier 5": "Command\nUnlocks the Command skill which can be used on an ally within 3 tiles to move them to the next position in the turn sequence.\nThe target recovers 1 Action Point.\nCost: 5 AP, 20 Fat",
+    "Tier 7": "Inspiring Presence (requires Banner)\nAny ally who is adjacent to an enemy, or is adjacent to an ally who is adjacent to an enemy, gains +3 Action Points as long as they start their turn adjacent to you.\nOnly members of your company are considered allies for this perk."
+  },
+  "Man Of Steel": {
+    "Tier 2": "Man of Steel\nArmor penetrating damage received is reduced by a percentage equal to 10% of the current durability of the armor piece hit.",
+    "Tier 4": "Sundering Strikes",
+    "Tier 5": "Sundering Strikes\nEffectiveness vs. Armor is increased by +20% for any weapon used."
+  },
+  "Marksmanship": {
+    "Tier 2": "Marksmanship (requires Ranged Weapon)\nGain 10% of your Base Ranged Skill as additional Minimum and Maximum Damage.",
+    "Tier 4": "Through the Ranks",
+    "Tier 5": "Through the Ranks\nRanged attacks have a 50% reduced chance to inflict friendly fire."
+  },
+  "Professional": {
+    "Tier 2": "Professional\nGain the first two perks in a random melee perk group that you have access to.\nDoes not refund already spend perk points.",
+    "Tier 4": "Mentor's Presence (skill)",
+    "Tier 5": "Mentor's Presence\nThe student of this character gains the Mentor's Presence effect.\nIf the student dies, this character will immediately recover 50% of built Fatigue and gain the Adrenaline effect."
+  },
+  "Rising Star": {
+    "Tier 2": "Rising Star\nExperience gained is increased by 20% for the next 5 levels and by 5% after that.\nGain 2 perk points upon completing your next 5 levels after picking this perk.",
+    "Tier 4": "Wear them Down",
+    "Tier 5": "Wear them Down\nSuccessful attacks apply the Worn Down effect on the target, increasing Fatigue cost by 10% and reducing Initiative by -10%.\nGain a stacking 20% chance that an enemy requires two successful rolls to hit you per negative status effect affecting the enemy.\nValid status effects include: worn down, stunned, dazed, rattled, netted, sleeping, staggered, rooted, webbed"
+  },
+  "Student": {
+    "Tier 2": "Student\nGain additional 20% Experience from battle. At the eleventh Character Level, you gain an additional Perk Point.\nWhen playing the Manhunters origin, your Indebted get the perk point refunded at the seventh Character Level.",
+    "Tier 4": "Mentor's Presence (effect)",
+    "Tier 5": "Mentor's Presence\nWhen in the presence of your mentor, gain multiple bonuses.\nAt the start of every turn, improve morale to confident. \nGain the Duelist and Rebuke perks, +10 Melee Skill, Melee Defense and Ranged Defense and +20 Resolve.\nWill lose 2 levels of morale upon the mentor's death."
+  },
+  "General": {
+    "Tier 1": "Bags and Belts\nUnlock two extra bag slots.\nItems placed in bags no longer apply a penalty to Maximum Fatigue, except for two-handed weapons"
+  }
+}
