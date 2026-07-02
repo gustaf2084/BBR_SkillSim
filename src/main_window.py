@@ -131,7 +131,10 @@ class MainWindow(QMainWindow):
         self.lang = nl
         i18n_set_lang(nl)
         try:
-            _save_settings(exe_dir(), {"lang": nl})
+            # 读取-合并-写回，避免整体覆写丢失 window/last_tab 等其他键
+            s = _load_settings(exe_dir())
+            s["lang"] = nl
+            _save_settings(exe_dir(), s)
         except Exception:
             pass
         self.gd.set_lang(nl)
