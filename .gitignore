@@ -29,6 +29,7 @@ release/
 # Runtime
 settings.json
 src/settings.json
+src/builds/
 
 # Temporary
 *.tmp

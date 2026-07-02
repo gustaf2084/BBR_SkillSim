@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from engine import SkillEngine
 from i18n import cat_name, prob_tier_metal, t
 
 # Category order and colors
@@ -57,7 +58,10 @@ class ReverseDeriveWorker(QThread):
     def __init__(self, engine, targets, mode, multi_trait, top_n,
                  use_attribute=True, use_projected=True):
         super().__init__()
-        self.engine = engine
+        # 独立引擎实例：共享只读 GameData，但缓存各自持有。
+        # 引擎实例缓存非线程安全，与正向页（主线程）共用同一实例
+        # 会产生跨线程 dict/OrderedDict 并发修改风险。
+        self.engine = SkillEngine(engine.gd)
         self.targets = targets
         self.mode = mode
         self.multi_trait = multi_trait
