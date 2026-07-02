@@ -576,12 +576,76 @@ class SkillEngine:
     # 出现概率（蒙特卡洛）
     # ------------------------------------------------------------------
 
+    def _mc_branch_plans(self, bg_id: str, trait_ids: list[str],
+                         use_attribute: bool = True,
+                         use_projected: bool = True,
+                         talent_stars: dict[str, float] | None = None,
+                         categories: list[str] | None = None,
+                         ) -> tuple[list[tuple[list[str], float, dict[str, tuple[list[str], list[float]]]]], float]:
+        """预计算各专属分支下、各类别的正权重池。
+
+        权重只依赖 (背景, 特性, 分支)，与采样无关——在采样循环外一次算好，
+        循环内零权重合成开销。
+        返回: ([(exc_groups, branch_p, {cat: (names, weights)}), ...], bp_sum)
+        """
+        branches: list[tuple[list[str], float]] = self.resolve_exclusive(bg_id)
+        bp_sum: float = sum(p for _, p in branches)
+        if bp_sum <= 0:
+            branches = [([], 1.0)]
+            bp_sum = 1.0
+        cats: list[str] = categories if categories is not None else CATEGORY_ORDER
+        plans: list[tuple[list[str], float, dict[str, tuple[list[str], list[float]]]]] = []
+        for exc_groups, branch_p in branches:
+            cat_pools: dict[str, tuple[list[str], list[float]]] = {}
+            for cat in cats:
+                names: list[str] = []
+                weights: list[float] = []
+                for g in self._groups_by_cat.get(cat, []):
+                    w: float = self.compute_raw_weight(
+                        bg_id, trait_ids, g,
+                        exclusive_active=exc_groups,
+                        use_attribute=use_attribute, use_projected=use_projected,
+                        talent_stars=talent_stars,
+                    )
+                    if w > 0:
+                        names.append(g)
+                        weights.append(w)
+                if names:
+                    cat_pools[cat] = (names, weights)
+            plans.append((exc_groups, branch_p, cat_pools))
+        return plans, bp_sum
+
+    @staticmethod
+    def _mc_roll_category(rng: random.Random, names: list[str], weights: list[float],
+                          n_low: int, n_frac: float, appeared: set[str]) -> None:
+        """对单个类别做一次无放回抽样，把骰中的组加入 appeared。"""
+        n_rolls: int = n_low + (1 if (n_frac > EPS and rng.random() < n_frac) else 0)
+        if n_rolls <= 0:
+            return
+        w_copy: list[float] = list(weights)
+        n_copy: list[str] = list(names)
+        for _k in range(min(n_rolls, len(n_copy))):
+            tw: float = sum(w_copy)
+            if tw <= 0:
+                break
+            rr: float = rng.random() * tw
+            a: float = 0.0
+            idx: int = 0
+            for j, ww in enumerate(w_copy):
+                a += ww
+                if rr <= a:
+                    idx = j
+                    break
+            appeared.add(n_copy[idx])
+            n_copy.pop(idx)
+            w_copy.pop(idx)
+
     def appear_prob_monte_carlo(self, bg_id: str, trait_ids: list[str], group: str,
                                 samples: int = 20000, seed: int = 42,
                                 use_attribute: bool = True,
                                 use_projected: bool = True,
                                 talent_stars: dict[str, float] | None = None) -> float:
-        """蒙特卡洛模拟单组出现概率。"""
+        """蒙特卡洛模拟单组出现概率。权重按分支预计算，采样循环内零合成开销。"""
         rng: random.Random = random.Random(seed)
         gd = self.gd
         bg: dict[str, Any] | None = gd.backgrounds.get(bg_id)
@@ -600,68 +664,77 @@ class SkillEngine:
         n_low: int = int(n)
         n_frac: float = n - n_low
 
-        branches: list[tuple[list[str], float]] = self.resolve_exclusive(bg_id)
-        # 归一化分支概率
-        bp_sum: float = sum(p for _, p in branches)
-        if bp_sum <= 0:
-            branches = [([], 1.0)]
-            bp_sum = 1.0
+        plans, bp_sum = self._mc_branch_plans(
+            bg_id, trait_ids, use_attribute=use_attribute,
+            use_projected=use_projected, talent_stars=talent_stars,
+            categories=[cat])
 
         hit: int = 0
-        cat_groups: list[str] = self._groups_by_cat.get(cat, [])
         for _ in range(samples):
             # 选专属分支
             r: float = rng.random() * bp_sum
             acc: float = 0.0
-            chosen_exc: list[str] = []
-            for exc_groups, p in branches:
+            pools: dict[str, tuple[list[str], list[float]]] = plans[-1][2]
+            for exc_groups, p, cat_pools in plans:
+                acc += p
+                if r <= acc:
+                    pools = cat_pools
+                    break
+            pool = pools.get(cat)
+            if pool is None:
+                continue
+            appeared: set[str] = set()
+            self._mc_roll_category(rng, pool[0], pool[1], n_low, n_frac, appeared)
+            if group in appeared:
+                hit += 1
+        return hit / samples
+
+    def _forward_monte_carlo_all(self, bg_id: str, trait_ids: list[str],
+                                 samples: int = 20000, seed: int = 42,
+                                 use_attribute: bool = True,
+                                 use_projected: bool = True,
+                                 talent_stars: dict[str, float] | None = None) -> dict[str, float]:
+        """联合蒙特卡洛：每次采样完整生成一次角色（全类别骰组），
+        同时统计所有组的出现次数。
+
+        与逐组调用 appear_prob_monte_carlo 相比，边际分布一致，但一次
+        模拟服务全部组（此前 forward_simulate MC 模式对 ~48 个组各跑
+        20000 次采样，且权重在循环内重复合成——两层冗余合计约 50×）。
+        返回: {group: 经验概率}（不含 Always 组；保证专属组由调用方覆盖）
+        """
+        rng: random.Random = random.Random(seed)
+        plans, bp_sum = self._mc_branch_plans(
+            bg_id, trait_ids, use_attribute=use_attribute,
+            use_projected=use_projected, talent_stars=talent_stars)
+        # 各类别骰组数
+        roll_spec: dict[str, tuple[int, float]] = {}
+        for cat in CATEGORY_ORDER:
+            n: float = self.num_rolls(bg_id, cat)
+            if n > 0:
+                roll_spec[cat] = (int(n), n - int(n))
+
+        counts: dict[str, int] = {}
+        for _ in range(samples):
+            # 选专属分支
+            r: float = rng.random() * bp_sum
+            acc: float = 0.0
+            chosen_exc: list[str] = plans[-1][0]
+            pools = plans[-1][2]
+            for exc_groups, p, cat_pools in plans:
                 acc += p
                 if r <= acc:
                     chosen_exc = exc_groups
+                    pools = cat_pools
                     break
-            # 合成权重
-            weights: list[float] = []
-            names: list[str] = []
-            for g in cat_groups:
-                w: float = self.compute_raw_weight(
-                    bg_id, trait_ids, g,
-                    exclusive_active=chosen_exc,
-                    use_attribute=use_attribute, use_projected=use_projected,
-                    talent_stars=talent_stars,
-                )
-                if w > 0:
-                    weights.append(w)
-                    names.append(g)
-            if not weights:
-                continue
-            # 本次采样的骰组数：n_frac 概率多骰一次
-            n_rolls: int = n_low + (1 if (n_frac > EPS and rng.random() < n_frac) else 0)
-            if n_rolls <= 0:
-                continue
-            # 无放回抽样 n_rolls 次
-            chosen: set[str] = set()
-            w_copy: list[float] = list(weights)
-            n_copy: list[str] = list(names)
-            for _k in range(min(n_rolls, len(n_copy))):
-                if not n_copy:
-                    break
-                tw: float = sum(w_copy)
-                if tw <= 0:
-                    break
-                rr: float = rng.random() * tw
-                a: float = 0.0
-                idx: int = 0
-                for j, ww in enumerate(w_copy):
-                    a += ww
-                    if rr <= a:
-                        idx = j
-                        break
-                chosen.add(n_copy[idx])
-                n_copy.pop(idx)
-                w_copy.pop(idx)
-            if group in chosen:
-                hit += 1
-        return hit / samples
+            appeared: set[str] = set(chosen_exc)  # 保证专属组直接出现
+            for cat, (n_low, n_frac) in roll_spec.items():
+                pool = pools.get(cat)
+                if pool is None:
+                    continue
+                self._mc_roll_category(rng, pool[0], pool[1], n_low, n_frac, appeared)
+            for g in appeared:
+                counts[g] = counts.get(g, 0) + 1
+        return {g: c / samples for g, c in counts.items()}
 
     # ------------------------------------------------------------------
     # 正向模拟
@@ -704,6 +777,15 @@ class SkillEngine:
         # so their guaranteed probability OVERRIDES the normal category roll.
         guaranteed_exclusive: dict[str, float] = self._get_guaranteed_exclusive_probs(bg_id)
 
+        # MC 模式：一次联合模拟得到全部组的经验概率
+        # （逐组独立模拟会把同一套采样跑 ~48 遍）
+        mc_probs: dict[str, float] = {}
+        if mode == "monte_carlo":
+            mc_probs = self._forward_monte_carlo_all(
+                bg_id, trait_ids, samples=samples, seed=seed,
+                use_attribute=use_attribute, use_projected=use_projected,
+                talent_stars=talent_stars)
+
         for group in self._all_groups:
             gdef: dict[str, Any] = gd.groups.get(group, {})
             cat: str | None = gdef.get("category")
@@ -719,10 +801,7 @@ class SkillEngine:
             if cat == "Exclusive" and group in guaranteed_exclusive:
                 p = guaranteed_exclusive[group]
             elif mode == "monte_carlo":
-                p: float = self.appear_prob_monte_carlo(
-                    bg_id, trait_ids, group, samples=samples, seed=seed,
-                    use_attribute=use_attribute, use_projected=use_projected,
-                    talent_stars=talent_stars)
+                p: float = mc_probs.get(group, 0.0)
             else:
                 p = self.appear_prob_analytic(
                     bg_id, trait_ids, group,
