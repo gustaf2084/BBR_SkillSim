@@ -7,6 +7,7 @@
 
 import json
 import os
+import re
 import sys
 
 
@@ -21,7 +22,11 @@ def _app_dir():
 
 
 def _load_i18n():
-    """加载 perk_i18n.json，返回 (name_map, desc_map) 两个字典。"""
+    """加载 perk_i18n.json，返回 (name_map, desc_map) 两个字典。
+
+    对带限定语（如 "(requires ...)"）的条目，同时注册去限定语的键，
+    使纯名字节点（如 Swift/Tier2 的 "Vigorous Assault"）也能命中。
+    """
     path = os.path.join(_app_dir(), "perk_i18n.json")
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -37,8 +42,16 @@ def _load_i18n():
         zh_desc = entry.get("desc_zh")
         if zh_name:
             name_map[en_name] = zh_name
+            # 若名字带末尾限定语 (requires ...) / (effect) / (skill)，同时注册纯名字键
+            base = re.sub(r"\s*\([^)]*\)\s*$", "", en_name).strip()
+            if base != en_name and base not in name_map:
+                name_map[base] = re.sub(r"\s*（[^）]*）\s*$", "", zh_name).strip()
         if zh_desc:
             desc_map[en_name] = zh_desc
+            # 同样为纯名字键注册描述
+            base = re.sub(r"\s*\([^)]*\)\s*$", "", en_name).strip()
+            if base != en_name and base not in desc_map:
+                desc_map[base] = zh_desc
     return name_map, desc_map
 
 

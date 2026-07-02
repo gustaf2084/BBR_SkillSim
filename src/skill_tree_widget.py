@@ -4,6 +4,8 @@ skill_tree_widget.py
 Skill tree group matrix visualization — with probability halo signature element.
 """
 
+import re
+
 from PySide6.QtCore import (
     QEasingCurve,
     QPointF,
@@ -686,6 +688,25 @@ class SkillTreeWidget(QWidget):
         self._chip_bar.setVisible(True)
 
         tier_labels = _tier_labels(self._lang)
+        # 构建跨组描述查找表：对于纯名字（无描述）的 perk 条目，尝试从其他组中找同名完整描述
+        desc_lookup = {}
+        for tree in active:
+            for tkey, perk_raw in tree.get("tiers", {}).items():
+                if not isinstance(perk_raw, str) or not perk_raw.strip():
+                    continue
+                if "\n" not in perk_raw:
+                    continue
+                parts = perk_raw.split("\n", 1)
+                full_name = parts[0].strip()
+                desc_text = parts[1].strip() if len(parts) > 1 else ""
+                if not desc_text:
+                    continue
+                # 去掉末尾的 (requires ...) / (effect) / (skill) 等限定语作为查找键
+                base = re.sub(r"\s*\([^)]*\)\s*$", "", full_name).strip()
+                desc_lookup[full_name] = desc_text
+                if base != full_name:
+                    desc_lookup[base] = desc_text
+
         for col, tree in enumerate(active):
             gid = tree["group_id"]
             prob = tree.get("probability", 0)
@@ -698,6 +719,10 @@ class SkillTreeWidget(QWidget):
                 parts = perk_raw.split("\n", 1)
                 sname = parts[0].strip()
                 sdesc = parts[1].strip() if len(parts) > 1 else ""
+                # 纯名字节点：从其他组查找完整描述
+                if not sdesc:
+                    base = re.sub(r"\s*\([^)]*\)\s*$", "", sname).strip()
+                    sdesc = desc_lookup.get(sname, "") or desc_lookup.get(base, "")
                 tlabel = tier_labels[row] if row < len(tier_labels) else f"Tier {row+1}"
                 node = SkillNode(gid, tlabel, sname, sdesc,
                                  prob, self._icon_provider, lang=self._lang)
