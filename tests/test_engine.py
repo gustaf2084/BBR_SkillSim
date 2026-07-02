@@ -412,7 +412,7 @@ class TestV030BgAttributes:
 
 
 class TestFractionalExclusiveRolls:
-    """v0.4.0: Exclusive 基线 0.5 = 50% 概率额外骰一次专属组。
+    """v0.3.0: Exclusive 基线 0.5 = 50% 概率额外骰一次专属组。
 
     非保证但有正权重的专属组因此获得 0.5×权重占比 的出现概率
     （此前 int(round(0.5))=0 使其恒为 0%）。保证组概率不受影响。

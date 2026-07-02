@@ -21,7 +21,7 @@ engine.py
     - Tactician 无 base_prob（null）→ 仅靠权重规则合成
     - 保证专属组（exclusive 配置 fixed/prob/mixed）概率由保证机制直接给出，覆盖类别骰组
     - 骰组数 n 含小数 f → 有 f 概率多骰一次（Exclusive 基线 0.5 = 50% 骰 1 次，
-      使非保证但有正权重的专属组获得真实概率，v0.4.0）
+      使非保证但有正权重的专属组获得真实概率，v0.3.0）
 
 两种计算模式：
   - analytic（解析近似）：类别内按合成权重归一，P(出现)=1-(1-p)^n
@@ -29,9 +29,10 @@ engine.py
 
 公开 API:
   class SkillEngine:
-    forward_simulate(bg_id, trait_ids, ...) -> {group: prob} 或 None（无可用方案）
-    reverse_derive(target_groups, weights, ...) -> [(bg, trait组合, prob), ...]
-    cascade_weights_for_exclusive(...) -> {group: weight}
+    forward_simulate(bg_id, trait_ids, ...) -> OrderedDict {group: prob} 或 None（无可用方案）
+    reverse_derive(target_groups, ...) -> {"max_score", "tied_count", "tiebreak_used",
+        "results": [(bg_id, trait组合, score, group_probs, purity), ...]}
+    exclusive_cascade_weights(exclusive_group_name) -> {group: weight}
 """
 
 from __future__ import annotations
@@ -74,17 +75,6 @@ DEFAULT_PROJECTED = {
 # 引擎
 # ---------------------------------------------------------------------------
 
-# Type aliases for readability
-GroupId = str
-BgId = str
-TraitId = str
-WeightDict = dict[str, float]
-Background = dict[str, Any]
-Trait = dict[str, Any]
-GroupDef = dict[str, Any]
-ReverseResultItem = tuple[str, tuple[str, ...], float, dict[str, float], float]
-ReverseResult = dict[str, Any]
-
 
 class SkillEngine:
     """技能树出现概率计算引擎。"""
@@ -94,7 +84,9 @@ class SkillEngine:
     default_rolls: dict[str, float]
     _groups_by_cat: dict[str, list[str]]
     _all_groups: list[str]
-    _forward_cache: dict[tuple, OrderedDict | None]
+    _complete_bgs_list: list[str]
+    _complete_bgs: set[str]
+    _forward_cache: OrderedDict
     _forward_cache_max: int
     _norepl_cache: dict[tuple, float]
     _norepl_cache_max: int
@@ -116,8 +108,12 @@ class SkillEngine:
         for cat in CATEGORY_ORDER:
             self._groups_by_cat[cat] = game_data.groups_by_category(cat)
         self._all_groups: list[str] = list(game_data.groups.keys())
+        # 完整背景列表/集合（引擎假定数据静态，与其余缓存一致）
+        self._complete_bgs_list: list[str] = game_data.complete_backgrounds()
+        self._complete_bgs: set[str] = set(self._complete_bgs_list)
         # 缓存层
-        self._forward_cache: dict[tuple, OrderedDict | None] = {}     # key -> OrderedDict | None (analytic only)
+        # forward 结果 LRU：命中移到末尾，淘汰最久未用
+        self._forward_cache: OrderedDict = OrderedDict()   # key -> OrderedDict | None (analytic only)
         self._forward_cache_max: int = 200
         # (target, 权重签名, n) -> 顶层出现概率；容量超限整体清空
         self._norepl_cache: dict[tuple, float] = {}
@@ -361,7 +357,7 @@ class SkillEngine:
     # 专属组确定
     # ------------------------------------------------------------------
 
-    def resolve_exclusive(self, bg_id: str, rng: random.Random | None = None) -> list[tuple[list[str], float]]:
+    def resolve_exclusive(self, bg_id: str) -> list[tuple[list[str], float]]:
         """
         根据背景的 exclusive 配置，返回可能的专属组结果列表（带概率）。
         返回: [(exclusive_groups_list, probability), ...]
@@ -445,7 +441,7 @@ class SkillEngine:
         记忆化——它们依赖 target 与权重签名，跨调用不可复用，实例级存储只会
         无界膨胀内存。
 
-        分数骰组（v0.4.0）：n 含小数部分 f 时，解释为「有 f 的概率多骰一次」，
+        分数骰组（v0.3.0）：n 含小数部分 f 时，解释为「有 f 的概率多骰一次」，
         即 P = (1-f)·P(floor(n)) + f·P(floor(n)+1)。Exclusive 类别基线 0.5
         由此获得真实语义（此前 int(round(0.5))=0 使非保证专属组恒为 0）。
         """
@@ -778,7 +774,7 @@ class SkillEngine:
         gd = self.gd
         if bg_id not in gd.backgrounds:
             return None
-        if bg_id not in gd.complete_backgrounds():
+        if bg_id not in self._complete_bgs:
             return None
 
         # analytic 模式缓存
@@ -787,6 +783,7 @@ class SkillEngine:
             cache_key = (bg_id, tuple(sorted(trait_ids)), use_attribute, use_projected,
                          tuple(sorted(talent_stars.items())) if talent_stars else None)
             if cache_key in self._forward_cache:
+                self._forward_cache.move_to_end(cache_key)  # LRU：命中刷新
                 return self._forward_cache[cache_key]
 
         results: dict[str, float] = OrderedDict()
@@ -842,11 +839,9 @@ class SkillEngine:
         sorted_results: OrderedDict = OrderedDict(sorted_items)
 
         if mode == "analytic":
-            # LRU 淘汰
+            # LRU 淘汰：删除最久未用的一个
             if len(self._forward_cache) >= self._forward_cache_max:
-                # 删除最早插入的一个
-                oldest: Any = next(iter(self._forward_cache))
-                del self._forward_cache[oldest]
+                self._forward_cache.popitem(last=False)
             self._forward_cache[cache_key] = sorted_results
 
         return sorted_results
@@ -907,7 +902,7 @@ class SkillEngine:
         gd = self.gd
         if weights is None:
             weights = {g: 1.0 for g in target_groups}
-        bgs: list[str] = gd.complete_backgrounds()
+        bgs: list[str] = self._complete_bgs_list
         trait_names: list[str] = sorted(gd.traits.keys())
 
         # 构造待遍历的特性组合
