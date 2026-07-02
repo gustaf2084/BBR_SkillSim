@@ -98,6 +98,8 @@ class SkillEngine:
     _forward_cache_max: int
     _norepl_cache: dict[tuple, float]
     _norepl_cache_max: int
+    _pool_cache: dict[tuple, dict[str, float]]
+    _pool_cache_max: int
     _bg_stars_cache: dict[str, dict[str, float]]
     _bg_proj_cache: dict[str, dict[str, float]]
 
@@ -120,6 +122,9 @@ class SkillEngine:
         # (target, 权重签名, n) -> 顶层出现概率；容量超限整体清空
         self._norepl_cache: dict[tuple, float] = {}
         self._norepl_cache_max: int = 50000
+        # (bg, traits, cat, branch, 开关) -> 类别权重池；容量超限整体清空
+        self._pool_cache: dict[tuple, dict[str, float]] = {}
+        self._pool_cache_max: int = 20000
         # 按背景缓存的天赋星期望 / 11 级投影属性（只依赖 bg_id，重算是纯浪费）
         self._bg_stars_cache: dict[str, dict[str, float]] = {}
         self._bg_proj_cache: dict[str, dict[str, float]] = {}
@@ -553,24 +558,48 @@ class SkillEngine:
         for exc_groups, branch_p in branches:
             if branch_p <= 0:
                 continue
-            # 合成该类别内所有组的权重
-            cat_groups: list[str] = self._groups_by_cat.get(cat, [])
-            weights: dict[str, float] = {}
-            for g in cat_groups:
-                w: float = self.compute_raw_weight(
-                    bg_id, trait_ids, g,
-                    exclusive_active=exc_groups,
-                    use_attribute=use_attribute, use_projected=use_projected,
-                    talent_stars=talent_stars,
-                )
-                if w > 0:
-                    weights[g] = w
+            weights: dict[str, float] = self._category_pool(
+                bg_id, trait_ids, cat, exc_groups,
+                use_attribute=use_attribute, use_projected=use_projected,
+                talent_stars=talent_stars)
             if not weights:
                 p_appear: float = 0.0
             else:
                 p_appear = self._appear_prob_no_replacement(weights, group, n)
             total_prob += branch_p * p_appear
         return min(1.0, max(0.0, total_prob))
+
+    def _category_pool(self, bg_id: str, trait_ids: list[str], cat: str,
+                       exc_groups: list[str],
+                       use_attribute: bool = True,
+                       use_projected: bool = True,
+                       talent_stars: dict[str, float] | None = None) -> dict[str, float]:
+        """合成某类别在给定分支下的正权重池 {group: weight}，带实例级缓存。
+
+        权重只依赖 (背景, 特性集合, 类别, 分支, 修正开关)。同一 forward
+        模拟对同类别的每个目标组都会用到同一张池——不缓存则重复合成
+        len(category) 遍。返回的 dict 为缓存共享对象，调用方不得修改。
+        """
+        stars_key = tuple(sorted(talent_stars.items())) if talent_stars else None
+        key: tuple = (bg_id, tuple(sorted(trait_ids)), cat, tuple(exc_groups),
+                      use_attribute, use_projected, stars_key)
+        cached = self._pool_cache.get(key)
+        if cached is not None:
+            return cached
+        weights: dict[str, float] = {}
+        for g in self._groups_by_cat.get(cat, []):
+            w: float = self.compute_raw_weight(
+                bg_id, trait_ids, g,
+                exclusive_active=exc_groups,
+                use_attribute=use_attribute, use_projected=use_projected,
+                talent_stars=talent_stars,
+            )
+            if w > 0:
+                weights[g] = w
+        if len(self._pool_cache) >= self._pool_cache_max:
+            self._pool_cache.clear()
+        self._pool_cache[key] = weights
+        return weights
 
     # ------------------------------------------------------------------
     # 出现概率（蒙特卡洛）
@@ -598,20 +627,12 @@ class SkillEngine:
         for exc_groups, branch_p in branches:
             cat_pools: dict[str, tuple[list[str], list[float]]] = {}
             for cat in cats:
-                names: list[str] = []
-                weights: list[float] = []
-                for g in self._groups_by_cat.get(cat, []):
-                    w: float = self.compute_raw_weight(
-                        bg_id, trait_ids, g,
-                        exclusive_active=exc_groups,
-                        use_attribute=use_attribute, use_projected=use_projected,
-                        talent_stars=talent_stars,
-                    )
-                    if w > 0:
-                        names.append(g)
-                        weights.append(w)
-                if names:
-                    cat_pools[cat] = (names, weights)
+                pool: dict[str, float] = self._category_pool(
+                    bg_id, trait_ids, cat, exc_groups,
+                    use_attribute=use_attribute, use_projected=use_projected,
+                    talent_stars=talent_stars)
+                if pool:
+                    cat_pools[cat] = (list(pool.keys()), list(pool.values()))
             plans.append((exc_groups, branch_p, cat_pools))
         return plans, bp_sum
 
@@ -991,25 +1012,22 @@ class SkillEngine:
         # purity = 该组合下非目标组的出现概率总和（越小越纯粹，越靠前）
         use_tiebreak: bool = len(deduped_list) > tiebreak_limit
         scored: list[tuple[str, tuple[str, ...], float, dict[str, float], float]] = []
+        target_set: set[str] = set(target_groups)
         for bg_id, combo, score, group_probs in deduped_list:
             purity: float = 0.0
             if use_tiebreak:
-                # 计算非目标组的总出现概率
-                for g in self._all_groups:
-                    if g in target_groups:
-                        continue
-                    gdef: dict[str, Any] = gd.groups.get(g, {})
-                    if gdef.get("category") == "Always":
-                        continue
-                    if mode == "monte_carlo":
-                        p = self.appear_prob_monte_carlo(
-                            bg_id, list(combo), g, use_attribute=use_attribute,
-                            use_projected=use_projected)
-                    else:
-                        p = self.appear_prob_analytic(
-                            bg_id, list(combo), g, use_attribute=use_attribute,
-                            use_projected=use_projected)
-                    purity += p
+                # 复用 forward_simulate：analytic 走 LRU 缓存，MC 联合模拟
+                # 一次出全组（此前逐组重算，每行 ~46 次独立计算）
+                fwd: OrderedDict | None = self.forward_simulate(
+                    bg_id, list(combo), mode=mode,
+                    use_attribute=use_attribute, use_projected=use_projected)
+                if fwd:
+                    for g, p in fwd.items():
+                        if g in target_set:
+                            continue
+                        if gd.groups.get(g, {}).get("category") == "Always":
+                            continue
+                        purity += p
             scored.append((bg_id, combo, score, group_probs, purity))
 
         # 排序：得分降序，同分时干扰分升序（purity 小=更纯粹=更靠前）
