@@ -40,7 +40,6 @@ from typing import Any
 
 from data_loader import GameData
 
-
 # ---------------------------------------------------------------------------
 # 常量
 # ---------------------------------------------------------------------------
@@ -432,7 +431,6 @@ class SkillEngine:
         def p_hit(mask: int, k: int) -> float:
             if k <= 0:
                 return 0.0
-            inner_key: tuple[int, int] = (mask, k)
             # 子结果存储在全局缓存中带前缀
             full_key: tuple = cache_key + (mask, k)
             if full_key in self._norepl_cache:
@@ -921,8 +919,9 @@ class SkillEngine:
 
 
 if __name__ == "__main__":
-    from data_loader import load_data
     import os
+
+    from data_loader import load_data
     here = os.path.dirname(os.path.abspath(__file__))
     gd = load_data(os.path.join(here, "data.json"))
     eng = SkillEngine(gd)
@@ -956,5 +955,7 @@ if __name__ == "__main__":
     rd2 = eng.reverse_derive(["Heavy Armor", "Shield", "Trained"], mode="analytic", top_n=5, tiebreak_limit=20, prune_threshold=20)
     print(f"  max_score={rd2['max_score']:.3f}, tied={rd2['tied_count']}, tiebreak={rd2.get('tiebreak_used')}")
     for bg, traits, score, probs, purity in rd2["results"][:3]:
-        ha = probs['Heavy Armor']; sh = probs['Shield']; tr = probs['Trained']
+        ha = probs['Heavy Armor']
+        sh = probs['Shield']
+        tr = probs['Trained']
         print(f"    {bg:40} {traits} score={score:.3f} HA={ha:.2f} Sh={sh:.2f} Tr={tr:.2f}")

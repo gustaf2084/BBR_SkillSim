@@ -32,7 +32,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r src/requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest tests/ -q
 
       - name: Build with PyInstaller
         working-directory: src
@@ -48,7 +51,7 @@ jobs:
           cp src/data.json release/
           cp src/perk_trees.json release/
           cp src/perk_i18n.json release/
-          cp -r src/icons release/ 2>/dev/null || true
+          cp -r src/icons release/
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4

@@ -5,21 +5,31 @@ Build recommendations page: auto analysis + custom build files (builds/*.txt).
 """
 
 import os
-import sys
 import subprocess
+import sys
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem, QLabel,
-    QGroupBox, QTextEdit, QSplitter, QTableWidget, QTableWidgetItem, QHeaderView,
-    QAbstractItemView, QPushButton, QFrame, QGridLayout, QScrollArea, QMessageBox,
-    QSizePolicy,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
-from PySide6.QtGui import QColor, QBrush, QFont
 
-from skill_tree_widget import SkillTreeWidget, build_skill_tree_data
-from build_parser import scan_builds, generate_template, create_example_file
+from build_parser import create_example_file, generate_template, scan_builds
 from i18n import t
+from skill_tree_widget import SkillTreeWidget, build_skill_tree_data
 
 
 def _app_dir():

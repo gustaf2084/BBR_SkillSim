@@ -7,12 +7,18 @@ Icon loading with placeholder fallback - upgraded badge-style placeholders.
 import os
 import re
 
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import (
-    QPixmap, QPainter, QColor, QFont, QIcon, QImage,
-    QLinearGradient, QPen, QPainterPath,
+    QColor,
+    QFont,
+    QIcon,
+    QImage,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
 )
-from PySide6.QtCore import Qt, QSize
-
 
 PLACEHOLDER_COLORS = {
     "backgrounds": QColor(60, 90, 140),

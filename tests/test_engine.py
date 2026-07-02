@@ -1,21 +1,22 @@
 # -*- coding: utf-8 -*-
 """Unit tests for engine.py - SkillEngine probability calculations."""
 
-import sys
 import os
-import math
+import sys
+
 import pytest
 
-_src = os.path.join(os.path.dirname(__file__), "..", "src")
-sys.path.insert(0, os.path.abspath(_src))
+_src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+if _src not in sys.path:  # conftest.py 已注入；直接运行本文件时兜底
+    sys.path.insert(0, _src)
 
-from engine import SkillEngine, RANGED_GROUPS, CATEGORY_ORDER
-from data_loader import load_data, GameData
+from data_loader import load_data
+from engine import RANGED_GROUPS, SkillEngine
 
 
 @pytest.fixture(scope="module")
 def gd():
-    data_path = os.path.join(os.path.abspath(_src), "data.json")
+    data_path = os.path.join(_src, "data.json")
     return load_data(data_path, strict_version=False, lang="zh")
 
 
@@ -124,7 +125,6 @@ class TestAnalyticVsMonteCarlo:
             f"diff={worst[3]:.3f} >= {self.TOLERANCE}")
 
     def test_consistency_squire(self, engine):
-        import copy
         eng2 = SkillEngine(engine.gd)
         groups = ["Sword", "Shield"]
         diffs = []
@@ -272,7 +272,7 @@ class TestProgressCallback:
         def callback(current, total):
             call_count[0] += 1
             return False
-        result = engine.reverse_derive(
+        engine.reverse_derive(
             ["Dagger"], mode="analytic", top_n=3, tiebreak_limit=20,
             prune_threshold=20,
             progress_callback=callback)

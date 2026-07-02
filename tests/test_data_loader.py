@@ -1,18 +1,20 @@
 # -*- coding: utf-8 -*-
 """Unit tests for data_loader.py - GameData loading and validation."""
 
-import sys
-import os
 import json
+import os
+import sys
 import tempfile
+
 import pytest
 
-_src = os.path.join(os.path.dirname(__file__), "..", "src")
-sys.path.insert(0, os.path.abspath(_src))
+_src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+if _src not in sys.path:  # conftest.py 已注入；直接运行本文件时兜底
+    sys.path.insert(0, _src)
 
-from data_loader import load_data, GameData, DataError, HIDDEN_BACKGROUNDS, EXCLUDED_BACKGROUNDS
+from data_loader import HIDDEN_BACKGROUNDS, DataError, GameData, load_data
 
-DATA_PATH = os.path.join(os.path.abspath(_src), "data.json")
+DATA_PATH = os.path.join(_src, "data.json")
 
 
 @pytest.fixture(scope="module")

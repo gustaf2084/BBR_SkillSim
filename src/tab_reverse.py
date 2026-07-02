@@ -5,16 +5,36 @@ Reverse derivation page: select target skill tree groups (multi-select), find be
 background + trait combinations.
 """
 
-from PySide6.QtCore import Qt, Signal, QThread
-from PySide6.QtGui import QColor, QBrush, QFont, QIcon
+from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QListWidget, QListWidgetItem,
-    QCheckBox, QPushButton, QTableWidget, QTableWidgetItem, QLabel, QHeaderView,
-    QGroupBox, QSpinBox, QMessageBox, QSplitter, QDoubleSpinBox, QComboBox,
-    QScrollArea, QFrame, QGridLayout, QDialog, QDialogButtonBox,
-    QProgressBar, QApplication, QFileDialog, QLineEdit,
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
-from i18n import t, cat_name, prob_tier_metal
+
+from i18n import cat_name, prob_tier_metal, t
 
 # Category order and colors
 CAT_ORDER = ["Shared", "Exclusive", "Weapon", "Armor", "Fighting Style", "Special"]
@@ -280,7 +300,7 @@ class ReverseTab(QWidget):
         # re-fill table if results exist
         if self._last_results is not None and self._last_results.get("results"):
             self._fill_table(self._last_results["results"], len(
-                [c for cbs in self._cat_checkboxes.values() for cb, _ in cbs if cb.isChecked()]) > 1)
+                [cb for cbs in self._cat_checkboxes.values() for cb, _ in cbs if cb.isChecked()]) > 1)
 
     def _refresh_result_title(self):
         """Rebuild result title from last derive results."""

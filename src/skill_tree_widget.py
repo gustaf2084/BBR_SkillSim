@@ -5,20 +5,38 @@ Skill tree group matrix visualization — with probability halo signature elemen
 """
 
 from PySide6.QtCore import (
-    Qt, QRectF, QPoint, QPointF, QPropertyAnimation, QEasingCurve, QTimer,
+    QEasingCurve,
+    QPointF,
+    QPropertyAnimation,
+    QRectF,
+    Qt,
+    QTimer,
 )
 from PySide6.QtGui import (
-    QColor, QBrush, QPen, QFont, QPainter, QPixmap, QPainterPath,
+    QBrush,
+    QColor,
+    QFont,
+    QPainter,
+    QPen,
 )
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGraphicsView, QGraphicsScene,
-    QGraphicsEllipseItem, QGraphicsItem, QGraphicsPixmapItem,
-    QLabel, QPushButton, QComboBox, QSizePolicy, QScrollArea,
-    QMenu, QFrame,
+    QFrame,
+    QGraphicsEllipseItem,
+    QGraphicsItem,
+    QGraphicsScene,
+    QGraphicsView,
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
-from perk_zh import get_perk_name_zh, get_perk_desc_zh
 from i18n import t
+from perk_zh import get_perk_desc_zh, get_perk_name_zh
+
 
 # ── shared utility ─────────────────────────────────────────────────
 def build_skill_tree_data(gd, results):
@@ -103,9 +121,9 @@ def _compute_composition(gd, trees, bg_id):
             composition.add(g)
 
     # ── 3. Always include extremely high-probability groups (>90%) ──
-    for t in trees:
-        if t.get("probability", 0) >= 0.90:
-            composition.add(t["group_id"])
+    for tree in trees:
+        if tree.get("probability", 0) >= 0.90:
+            composition.add(tree["group_id"])
 
     return composition
 
@@ -594,8 +612,8 @@ class SkillTreeWidget(QWidget):
             self._active_ids.add(group_id)
             self._rebuild()
         active = [t for t in self._all_trees if t["group_id"] in self._active_ids]
-        for col, t in enumerate(active):
-            if t["group_id"] == group_id:
+        for col, tree in enumerate(active):
+            if tree["group_id"] == group_id:
                 target_x = MATRIX_LEFT + col * CELL_W - 40
                 target_x = max(0, target_x)
                 self._animate_scroll(target_x)
@@ -658,18 +676,18 @@ class SkillTreeWidget(QWidget):
                 w.deleteLater()
 
         active = [t for t in self._all_trees if t["group_id"] in self._active_ids]
-        for t in active:
-            gid = t["group_id"]
-            prob = t.get("probability", 0)
-            gname = t.get("group_name", gid)
+        for tree in active:
+            gid = tree["group_id"]
+            prob = tree.get("probability", 0)
+            gname = tree.get("group_name", gid)
             pct = int(prob * 100)
 
             chip = QFrame()
             chip.setFrameShape(QFrame.StyledPanel)
             chip.setStyleSheet(
-                f"QFrame {{ background: #F5F0E8; border: 1px solid #DDD6CC; "
-                f"border-radius: 12px; padding: 2px; }}"
-                f"QFrame:hover {{ border-color: #C8BFA8; }}"
+                "QFrame { background: #F5F0E8; border: 1px solid #DDD6CC; "
+                "border-radius: 12px; padding: 2px; }"
+                "QFrame:hover { border-color: #C8BFA8; }"
             )
             chip_layout = QHBoxLayout(chip)
             chip_layout.setContentsMargins(8, 1, 4, 1)

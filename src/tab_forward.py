@@ -1,18 +1,36 @@
 # -*- coding: utf-8 -*-
 """tab_forward.py - forward simulation page."""
 
-from collections import OrderedDict
-from PySide6.QtCore import Qt, QTimer, QStringListModel
-from PySide6.QtGui import QColor, QBrush, QFont
+from PySide6.QtCore import QStringListModel, Qt
+from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QComboBox,
-    QCheckBox, QPushButton, QTableWidget, QTableWidgetItem,
-    QLabel, QHeaderView, QGroupBox, QProgressBar, QMessageBox, QSplitter,
-    QAbstractItemView, QGridLayout, QScrollArea, QSizePolicy, QFrame,
-    QCompleter, QApplication, QFileDialog, QLineEdit,
+    QAbstractItemView,
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QCompleter,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
+
+from i18n import cat_name, prob_tier_label, t
 from skill_tree_widget import SkillTreeWidget, build_skill_tree_data
-from i18n import t, prob_tier_label, cat_name
 
 # Category display colors (visual only, not language-specific)
 CAT_COLOR = {

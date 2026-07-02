@@ -5,7 +5,7 @@ ui_components.py
 """
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 
 def make_placeholder(text, sub_text=""):

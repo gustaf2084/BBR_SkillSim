@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """data_loader.py - load & validate data.json, provide GameData object."""
 
-import json, os
+import json
+import os
 from collections import OrderedDict
 from typing import Any
 

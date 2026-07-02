@@ -1,18 +1,30 @@
 # -*- coding: utf-8 -*-
 """main_window.py - left nav + right stacked pages + language toggle."""
 
-import os, sys, traceback
+import os
+import sys
+import traceback
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
-    QStackedWidget, QLabel, QPushButton, QMessageBox, QStatusBar,
-    QListWidget, QListWidgetItem, QApplication,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QStackedWidget,
+    QStatusBar,
+    QVBoxLayout,
+    QWidget,
 )
-from data_loader import load_data, DataError, _load_settings, _save_settings
+
+from data_loader import _load_settings, _save_settings, load_data
 from engine import SkillEngine
+from i18n import set_lang as i18n_set_lang
 from icon_provider import IconProvider
-from i18n import set_lang as i18n_set_lang, t
 
 
 def _read_version():
@@ -175,7 +187,10 @@ class MainWindow(QMainWindow):
 
         ttl = QLabel("Skill Simulator")
         ttl.setObjectName("nav_button")
-        f = QFont(); f.setPointSize(14); f.setBold(True); ttl.setFont(f)
+        f = QFont()
+        f.setPointSize(14)
+        f.setBold(True)
+        ttl.setFont(f)
         ttl.setStyleSheet("border-left:3px solid #B8860B;padding-left:11px;")
         nl.addWidget(ttl)
         nl.addSpacing(12)
@@ -227,10 +242,10 @@ class MainWindow(QMainWindow):
 
     def _build_tabs(self):
         try:
+            from tab_about import AboutTab
+            from tab_builds import BuildsTab
             from tab_forward import ForwardTab
             from tab_reverse import ReverseTab
-            from tab_builds import BuildsTab
-            from tab_about import AboutTab
             self.forward_tab = ForwardTab()
             self.reverse_tab = ReverseTab()
             self.builds_tab = BuildsTab()
@@ -251,26 +266,26 @@ class MainWindow(QMainWindow):
 
     def _error_page(self):
         w = QWidget()
-        l = QVBoxLayout(w)
-        l.setAlignment(Qt.AlignCenter)
+        lay = QVBoxLayout(w)
+        lay.setAlignment(Qt.AlignCenter)
         tt = QLabel("DATA LOAD FAILED")
         tt.setStyleSheet("font-size:22px;font-weight:bold;color:#c0392b;")
         tt.setAlignment(Qt.AlignCenter)
-        l.addWidget(tt)
+        lay.addWidget(tt)
         detail = self._data_error or "(no details)"
         m = QLabel(detail + "\n\npath: " + str(self.data_path))
         m.setWordWrap(True)
         m.setStyleSheet("font-size:13px;padding:20px;font-family:Consolas,monospace;")
         m.setAlignment(Qt.AlignCenter)
         m.setMaximumWidth(750)
-        l.addWidget(m)
+        lay.addWidget(m)
         hint = QLabel("Put data.json next to the exe and restart.")
         hint.setStyleSheet("font-size:13px;color:#555;padding:10px;")
         hint.setAlignment(Qt.AlignCenter)
-        l.addWidget(hint)
+        lay.addWidget(hint)
         b = QPushButton("Retry")
         b.clicked.connect(self._retry)
-        l.addWidget(b, 0, Qt.AlignCenter)
+        lay.addWidget(b, 0, Qt.AlignCenter)
         return w
 
     def _retry(self):

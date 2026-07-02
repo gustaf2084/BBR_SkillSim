@@ -7,6 +7,10 @@ exclude = ["__pycache__", "build", "dist", "release", ".git"]
 select = ["E", "F", "W", "I"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+# 测试文件需在 sys.path 注入后再导入 src 模块
+"tests/*" = ["E402"]
+
 [tool.mypy]
 python_version = "3.10"
 ignore_missing_imports = true

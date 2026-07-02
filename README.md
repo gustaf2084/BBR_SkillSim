@@ -24,16 +24,16 @@ Battle Brothers Reforged 模组的角色 build 概率分析工具。输入背景
 ### 开发者运行
 
 ```bash
-cd src
 pip install -r requirements.txt
+cd src
 python main.py
 ```
 
 ### 打包
 
 ```bash
-cd src
 pip install -r requirements-dev.txt
+cd src
 pyinstaller build_safe.spec
 ```
 

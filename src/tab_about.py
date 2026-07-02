@@ -6,9 +6,14 @@ About page — software info, data version, usage tips in card layout.
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QGroupBox,
-    QFrame, QSizePolicy, QGridLayout,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
+
 from i18n import t
 
 
@@ -107,7 +112,7 @@ class AboutTab(QWidget):
             f"{t('about.data_skill_pts').format(gd.skill_points)}）</p>"
         )
         if inc:
-            data_text += f"<p style='font-size:11px; color:#8B8378;'>"
+            data_text += "<p style='font-size:11px; color:#8B8378;'>"
             data_text += f"{t('about.data_hidden')}{', '.join(inc[:10])}"
             if len(inc) > 10:
                 data_text += f" …{t('about.data_bg_incomplete')}{len(inc)} "
