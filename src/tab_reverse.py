@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QFrame,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -34,19 +33,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+import theme
 from engine import SkillEngine
 from i18n import cat_name, prob_tier_metal, t
-
-# Category order and colors
-CAT_ORDER = ["Shared", "Exclusive", "Weapon", "Armor", "Fighting Style", "Special"]
-CAT_COLOR = {
-    "Shared":        "#27704B",
-    "Exclusive":     "#8B6914",
-    "Weapon":        "#5A6B7D",
-    "Armor":         "#7B6B5A",
-    "Fighting Style":"#8B1A6B",
-    "Special":       "#B8860B",
-}
+from ui_components import CollapsibleSection, make_placeholder
 
 
 class ReverseDeriveWorker(QThread):
@@ -102,7 +92,7 @@ class ReverseTab(QWidget):
         self.gd = None
         self.engine = None
         self.icon_provider = None
-        self._cat_panels = {}       # category -> QGroupBox
+        self._cat_panels = {}       # category -> CollapsibleSection
         self._cat_checkboxes = {}   # category -> list of (QCheckBox, group_id)
         self._last_results = None
         self._worker = None         # QThread worker
@@ -117,19 +107,17 @@ class ReverseTab(QWidget):
         lv = QVBoxLayout(left)
         lv.setSpacing(8)
 
-        # target group selection area (scrollable)
-        self._target_grp = QGroupBox(t("reverse.target_title"))
-        target_lv = QVBoxLayout(self._target_grp)
+        self._target_title = QLabel(t("reverse.target_title"))
+        self._target_title.setObjectName("section_title")
+        lv.addWidget(self._target_title)
 
         # search filter
         self.target_search = QLineEdit()
+        self.target_search.setObjectName("search_input")
         self.target_search.setPlaceholderText(t("reverse.search_ph"))
         self.target_search.setClearButtonEnabled(True)
-        self.target_search.setStyleSheet(
-            "QLineEdit { padding: 4px 8px; border: 1px solid #DDD6CC; "
-            "border-radius: 4px; background: #FFFEF9; font-size: 12px; }")
         self.target_search.textChanged.connect(self._on_target_search)
-        target_lv.addWidget(self.target_search)
+        lv.addWidget(self.target_search)
 
         target_scroll = QScrollArea()
         target_scroll.setWidgetResizable(True)
@@ -139,14 +127,12 @@ class ReverseTab(QWidget):
         self._cat_layout.setSpacing(4)
         self._cat_layout.setContentsMargins(0, 0, 0, 0)
         target_scroll.setWidget(self._cat_container)
-        target_lv.addWidget(target_scroll)
-        lv.addWidget(self._target_grp, 1)
+        lv.addWidget(target_scroll, 1)
 
-        # advanced
-        self._adv_grp = QGroupBox(t("reverse.advanced"))
-        self._adv_grp.setCheckable(True)
-        self._adv_grp.setChecked(False)
-        adv_form = QFormLayout(self._adv_grp)
+        # advanced (true collapsible section)
+        self._adv_sec = CollapsibleSection(t("reverse.advanced"), expanded=False)
+        adv_form = QFormLayout(self._adv_sec.content)
+        adv_form.setContentsMargins(10, 8, 10, 8)
 
         self.multi_trait_check = QCheckBox(t("reverse.multi_trait"))
         adv_form.addRow(self.multi_trait_check)
@@ -163,7 +149,7 @@ class ReverseTab(QWidget):
         self._rev_mode_label = QLabel(t("common.mode_label"))
         adv_form.addRow(self._rev_mode_label, self.mode_combo)
 
-        lv.addWidget(self._adv_grp)
+        lv.addWidget(self._adv_sec)
 
         # derive button
         self.derive_btn = QPushButton(t("reverse.derive_btn"))
@@ -178,16 +164,12 @@ class ReverseTab(QWidget):
         lv.addWidget(self.progress_bar)
 
         self.progress_label = QLabel("")
-        self.progress_label.setStyleSheet("font-size: 11px; color: #6B6359;")
+        self.progress_label.setObjectName("caption_label")
         self.progress_label.setVisible(False)
         lv.addWidget(self.progress_label)
 
-        self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.setStyleSheet(
-            "QPushButton { font-size: 11px; padding: 4px 12px; "
-            "background: #F0E0E0; border: 1px solid #C0392B; border-radius: 4px; "
-            "color: #C0392B; }"
-            "QPushButton:hover { background: #E8D0D0; }")
+        self.cancel_btn = QPushButton(t("common.cancel"))
+        self.cancel_btn.setObjectName("cancel_btn")
         self.cancel_btn.setVisible(False)
         self.cancel_btn.clicked.connect(self._on_cancel)
         lv.addWidget(self.cancel_btn)
@@ -203,10 +185,21 @@ class ReverseTab(QWidget):
         self.result_title.setObjectName("page_title")
         rv.addWidget(self.result_title)
 
+        # empty-state guide (shown until the first derivation)
+        self.guide_widget = make_placeholder(
+            t("reverse.guide_title"), t("reverse.guide_body"))
+        rv.addWidget(self.guide_widget, 1)
+
         self.summary_label = QLabel("")
-        self.summary_label.setStyleSheet("font-size: 13px; color: #6B6359; padding: 4px;")
+        self.summary_label.setObjectName("summary_label")
         self.summary_label.setWordWrap(True)
         rv.addWidget(self.summary_label)
+
+        # double-click hint
+        self._dblclick_hint = QLabel(t("reverse.hint_dblclick"))
+        self._dblclick_hint.setObjectName("caption_label")
+        self._dblclick_hint.setVisible(False)
+        rv.addWidget(self._dblclick_hint)
 
         self.result_table = QTableWidget(0, 4)
         self._reverse_headers = [
@@ -221,6 +214,7 @@ class ReverseTab(QWidget):
         self.result_table.verticalHeader().setVisible(False)
         self.result_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.result_table.setAlternatingRowColors(True)
+        self.result_table.setVisible(False)
         self.result_table.itemDoubleClicked.connect(self._on_row_double_clicked)
         rv.addWidget(self.result_table, 1)
 
@@ -228,17 +222,11 @@ class ReverseTab(QWidget):
         export_row = QHBoxLayout()
         export_row.addStretch()
         self.copy_btn = QPushButton(t("reverse.copy_btn"))
-        self.copy_btn.setStyleSheet(
-            "QPushButton { padding: 4px 16px; border: 1px solid #BBB; "
-            "border-radius: 4px; font-size: 12px; }"
-            "QPushButton:hover { background: #E8E4DC; }")
+        self.copy_btn.setObjectName("secondary_btn")
         self.copy_btn.clicked.connect(self._copy_as_text)
         export_row.addWidget(self.copy_btn)
         self.export_btn = QPushButton(t("reverse.export_btn"))
-        self.export_btn.setStyleSheet(
-            "QPushButton { padding: 4px 16px; border: 1px solid #BBB; "
-            "border-radius: 4px; font-size: 12px; }"
-            "QPushButton:hover { background: #E8E4DC; }")
+        self.export_btn.setObjectName("secondary_btn")
         self.export_btn.clicked.connect(self._export_csv)
         export_row.addWidget(self.export_btn)
         rv.addLayout(export_row)
@@ -251,8 +239,8 @@ class ReverseTab(QWidget):
         self._empty_title_lbl.setObjectName("notice_parchment_title")
         elv.addWidget(self._empty_title_lbl)
         self._empty_body_lbl = QLabel(t("reverse.empty_body"))
+        self._empty_body_lbl.setObjectName("notice_parchment_body")
         self._empty_body_lbl.setWordWrap(True)
-        self._empty_body_lbl.setStyleSheet("font-size: 14px; color: #1C1814; padding-top: 4px;")
         elv.addWidget(self._empty_body_lbl)
         self.empty_label.setVisible(False)
         rv.addWidget(self.empty_label)
@@ -272,19 +260,24 @@ class ReverseTab(QWidget):
 
     def retranslate(self):
         """Refresh all static text to current language."""
-        self._target_grp.setTitle(t("reverse.target_title"))
-        self._adv_grp.setTitle(t("reverse.advanced"))
+        self._target_title.setText(t("reverse.target_title"))
+        self._adv_sec.set_title(t("reverse.advanced"))
         self.multi_trait_check.setText(t("reverse.multi_trait"))
         self._topn_label.setText(t("reverse.topn_label"))
         self._rev_mode_label.setText(t("common.mode_label"))
         self.mode_combo.setItemText(0, t("mode.analytic"))
         self.mode_combo.setItemText(1, t("mode.monte_slow"))
         self.derive_btn.setText(t("reverse.derive_btn"))
+        self.cancel_btn.setText(t("common.cancel"))
         self.target_search.setPlaceholderText(t("reverse.search_ph"))
         self.copy_btn.setText(t("reverse.copy_btn"))
         self.export_btn.setText(t("reverse.export_btn"))
         self._empty_title_lbl.setText(t("reverse.empty_title"))
         self._empty_body_lbl.setText(t("reverse.empty_body"))
+        self._dblclick_hint.setText(t("reverse.hint_dblclick"))
+        self.guide_widget.title_label.setText(t("reverse.guide_title"))
+        self.guide_widget.sub_label.setText(t("reverse.guide_body"))
+        self.guide_widget.sub_label.setVisible(True)
         # result title
         if self._last_results is None:
             self.result_title.setText(t("reverse.result_title_ph"))
@@ -300,19 +293,24 @@ class ReverseTab(QWidget):
         for cat, panel in self._cat_panels.items():
             if panel is not None:
                 groups = self.gd.groups_by_category(cat) if self.gd else []
-                panel.setTitle(f"{cat_name(cat)} ({len(groups)})")
+                panel.set_title(f"{cat_name(cat)} ({len(groups)})")
         # re-fill table if results exist
         if self._last_results is not None and self._last_results.get("results"):
             self._fill_table(self._last_results["results"], len(
                 [cb for cbs in self._cat_checkboxes.values() for cb, _ in cbs if cb.isChecked()]) > 1)
 
+    def retheme(self):
+        """主题切换后重刷表格内代码设置的颜色。"""
+        for cat, panel in self._cat_panels.items():
+            panel.set_title_color(theme.cat_text_color(cat))
+        if self._last_results is not None and self._last_results.get("results"):
+            multi = len([cb for cbs in self._cat_checkboxes.values()
+                         for cb, _ in cbs if cb.isChecked()]) > 1
+            self._fill_table(self._last_results["results"], multi)
+
     def _refresh_result_title(self):
         """Rebuild result title from last derive results."""
-        targets = []
-        for cat, cbs in self._cat_checkboxes.items():
-            for cb, gid in cbs:
-                if cb.isChecked():
-                    targets.append(gid)
+        targets = self._checked_targets()
         if not targets:
             self.result_title.setText(t("reverse.result_title_ph"))
             return
@@ -321,28 +319,38 @@ class ReverseTab(QWidget):
             title = title[:77] + "..."
         self.result_title.setText(title)
 
+    def _checked_targets(self):
+        targets = []
+        for cat, cbs in self._cat_checkboxes.items():
+            for cb, gid in cbs:
+                if cb.isChecked():
+                    targets.append(gid)
+        return targets
+
     def _build_category_panels(self):
-        """Build 6 category collapsible panels with QCheckBox grids inside."""
+        """Build category collapsible panels with QCheckBox grids inside."""
         # clear old
         for cat, panel in self._cat_panels.items():
             self._cat_layout.removeWidget(panel)
             panel.deleteLater()
         self._cat_panels.clear()
         self._cat_checkboxes.clear()
+        # remove trailing stretch if present
+        while self._cat_layout.count():
+            item = self._cat_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
 
-        for cat in CAT_ORDER:
+        for cat in theme.CAT_ORDER:
             groups = self.gd.groups_by_category(cat)
             if not groups:
                 continue
-            panel = QGroupBox(f"{cat_name(cat)} ({len(groups)})")
-            panel.setCheckable(True)
-            panel.setChecked(False)
-            panel.setStyleSheet(
-                f"QGroupBox::title {{ color: {CAT_COLOR.get(cat, '#333')}; }}"
-            )
-            grid = QGridLayout(panel)
+            panel = CollapsibleSection(f"{cat_name(cat)} ({len(groups)})", expanded=False)
+            panel.set_title_color(theme.cat_text_color(cat))
+            grid = QGridLayout(panel.content)
             grid.setSpacing(3)
-            grid.setContentsMargins(8, 16, 8, 8)
+            grid.setContentsMargins(8, 8, 8, 8)
 
             cbs = []
             for i, g in enumerate(groups):
@@ -364,13 +372,7 @@ class ReverseTab(QWidget):
         if self.gd is None or self.engine is None:
             return
 
-        # collect all checked target groups
-        targets = []
-        for cat, cbs in self._cat_checkboxes.items():
-            for cb, gid in cbs:
-                if cb.isChecked():
-                    targets.append(gid)
-
+        targets = self._checked_targets()
         if not targets:
             QMessageBox.warning(self, t("reverse.need_target_title"),
                                 t("reverse.need_target_body"))
@@ -385,7 +387,7 @@ class ReverseTab(QWidget):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.progress_label.setVisible(True)
-        self.progress_label.setText("Calculating...")
+        self.progress_label.setText(t("common.calculating"))
         self.cancel_btn.setVisible(True)
 
         # start worker thread
@@ -401,7 +403,7 @@ class ReverseTab(QWidget):
             pct = int((current + 1) / total * 100)
             self.progress_bar.setValue(pct)
             self.progress_label.setText(
-                f"Processing background {current + 1} of {total}...")
+                t("reverse.progress_bg").format(current + 1, total))
 
     def _on_worker_finished(self, result):
         self._finish_derive(result)
@@ -427,24 +429,22 @@ class ReverseTab(QWidget):
             return
 
         self._last_results = rd
+        self.guide_widget.setVisible(False)
         self.empty_label.setVisible(False)
         self.result_table.setVisible(True)
+        self._dblclick_hint.setVisible(True)
 
         if not rd["results"]:
             self.result_table.setRowCount(0)
             self.result_title.setText(t("reverse.result_none"))
             self.empty_label.setVisible(True)
+            self._dblclick_hint.setVisible(False)
             self.summary_label.setText("")
             self._last_results = None
             return
 
-        multi = len([cb for cbs in self._cat_checkboxes.values()
-                     for cb, _ in cbs if cb.isChecked()]) > 1
-        targets = []
-        for cat, cbs in self._cat_checkboxes.items():
-            for cb, gid in cbs:
-                if cb.isChecked():
-                    targets.append(gid)
+        targets = self._checked_targets()
+        multi = len(targets) > 1
         title = t("reverse.result_ok_prefix") + " / ".join(self.gd.group_name(t) for t in targets)
         if len(title) > 80:
             title = title[:77] + "..."
@@ -468,16 +468,19 @@ class ReverseTab(QWidget):
         data_font.setStyleHint(QFont.Monospace)
 
         for row, (bg, traits, score, probs, purity) in enumerate(results):
-            # background col: icon + display name
-            bg_text = self.gd.bg_name(bg)
-            bg_item = QTableWidgetItem(f"  {bg_text}  ({bg})")
+            # background col: icon + display name (bg_id 存 UserRole,不再拼进文本)
+            bg_item = QTableWidgetItem(self.gd.bg_name(bg))
+            bg_item.setData(Qt.UserRole, bg)
+            bg_item.setToolTip(bg)
             if self.icon_provider:
                 bg_item.setIcon(self.icon_provider.get_icon(bg, "backgrounds", 24))
             self.result_table.setItem(row, 0, bg_item)
 
-            # traits col
+            # traits col (trait id 列表存 UserRole)
             trait_text = ", ".join(self.gd.trait_name(t) for t in traits) if traits else t("common.no_traits")
-            self.result_table.setItem(row, 1, QTableWidgetItem(trait_text))
+            trait_item = QTableWidgetItem(trait_text)
+            trait_item.setData(Qt.UserRole, list(traits))
+            self.result_table.setItem(row, 1, trait_item)
 
             # prob/score col
             if multi:
@@ -495,10 +498,10 @@ class ReverseTab(QWidget):
             purity_item = QTableWidgetItem(f"{purity:.2f}")
             purity_item.setTextAlignment(Qt.AlignCenter)
             if purity <= 0.5:
-                purity_item.setBackground(QBrush(QColor("#E0F0E0")))
+                purity_item.setBackground(QBrush(QColor(theme.c("purity_good_bg"))))
                 purity_item.setToolTip(t("reverse.purity_low_tip"))
             elif purity > 2.0:
-                purity_item.setBackground(QBrush(QColor("#F0E0E0")))
+                purity_item.setBackground(QBrush(QColor(theme.c("purity_bad_bg"))))
                 purity_item.setToolTip(t("reverse.purity_high_tip"))
             self.result_table.setItem(row, 3, purity_item)
 
@@ -512,24 +515,10 @@ class ReverseTab(QWidget):
         if not bg_item or not trait_item:
             return
 
-        # extract bg_id from background text
-        bg_text = bg_item.text().strip()
-        # format: "  display_name  (bg_id)"
-        if "(" in bg_text and bg_text.endswith(")"):
-            bg_id = bg_text[bg_text.rindex("(") + 1:-1]
-        else:
+        bg_id = bg_item.data(Qt.UserRole)
+        if not bg_id:
             return
-
-        trait_text = trait_item.text().strip()
-        trait_ids = []
-        no_traits_text = t("common.no_traits")
-        if trait_text != no_traits_text:
-            for tname in trait_text.split(", "):
-                tname = tname.strip()
-                for tid in self.gd.traits:
-                    if self.gd.trait_name(tid) == tname:
-                        trait_ids.append(tid)
-                        break
+        trait_ids = trait_item.data(Qt.UserRole) or []
 
         try:
             res = self.engine.forward_simulate(bg_id, trait_ids, mode="analytic")
@@ -584,7 +573,7 @@ class ReverseTab(QWidget):
         dlg.exec()
 
     def _on_target_search(self, text):
-        """Filter target group checkboxes by search text."""
+        """Filter target group checkboxes by search text; auto-expand matching panels."""
         q = text.strip().lower()
         for cat, cbs in self._cat_checkboxes.items():
             any_visible = False
@@ -596,8 +585,18 @@ class ReverseTab(QWidget):
             panel = self._cat_panels.get(cat)
             if panel:
                 panel.setVisible(any_visible)
+                if q:
+                    panel.set_expanded(any_visible)
+                else:
+                    panel.set_expanded(False)
 
     # ── export ──────────────────────────────────────────────
+
+    def _notify(self, msg):
+        """在主窗口状态栏显示临时反馈。"""
+        w = self.window()
+        if hasattr(w, "statusBar"):
+            w.statusBar().showMessage(msg, 2000)
 
     def _rows_data(self):
         """Yield (bg_id, display_name, traits, score, purity) for each result row."""
@@ -608,10 +607,8 @@ class ReverseTab(QWidget):
             purity_item = self.result_table.item(row, 3)
             if not bg_item or not trait_item:
                 continue
+            bg_id = bg_item.data(Qt.UserRole) or ""
             bg_text = bg_item.text().strip()
-            bg_id = ""
-            if "(" in bg_text and bg_text.endswith(")"):
-                bg_id = bg_text[bg_text.rindex("(") + 1:-1]
             traits_text = trait_item.text().strip()
             score_text = score_item.text().strip() if score_item else ""
             purity_text = purity_item.text().strip() if purity_item else ""
@@ -623,6 +620,7 @@ class ReverseTab(QWidget):
         for bg_id, bg_text, traits_text, score_text, purity_text in self._rows_data():
             lines.append(f"{bg_id}\t{bg_text}\t{traits_text}\t{score_text}\t{purity_text}")
         QApplication.clipboard().setText("\n".join(lines))
+        self._notify(t("common.copied"))
 
     def _export_csv(self):
         """Save current table as CSV file."""

@@ -30,10 +30,12 @@ from PySide6.QtWidgets import (
     QMenu,
     QPushButton,
     QScrollArea,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
 
+import theme
 from i18n import t
 from perk_zh import get_perk_desc_zh, get_perk_name_zh
 
@@ -148,15 +150,8 @@ def _tier_labels(lang="zh"):
 
 
 def prob_fill_color(p):
-    if p >= 0.80:
-        return QColor("#27704B")
-    if p >= 0.50:
-        return QColor("#A0522D")
-    if p >= 0.20:
-        return QColor("#5A6B7D")
-    if p > 0:
-        return QColor("#8B8378")
-    return QColor("#B0B0B0")
+    """概率分层色,取自 theme(随主题切换)。"""
+    return QColor(theme.prob_color(p))
 
 
 def prob_halo_color(p):
@@ -200,7 +195,7 @@ class SkillNode(QGraphicsEllipseItem):
     def _apply_style(self):
         if self._highlighted:
             self.setBrush(QBrush(self._color.lighter(130)))
-            self.setPen(QPen(QColor("#B8860B"), 2.5))
+            self.setPen(QPen(QColor(theme.c("accent")), 2.5))
             self.setOpacity(1.0)
         else:
             self.setBrush(QBrush(self._color))
@@ -223,14 +218,17 @@ class SkillNode(QGraphicsEllipseItem):
         # 2) draw node body (filled circle + border)
         super().paint(painter, option, widget)
 
-        # 3) draw perk icon (inside the node)
+        # 3) draw perk icon (inside the node) — 按 devicePixelRatio 请求高分辨率避免 HiDPI 模糊
         icon_size = NODE_DIAM - 6
         if self._icon_provider and self.skill_name:
             pix = self._icon_provider.get_perk_icon(self.skill_name, icon_size)
             if pix and not pix.isNull():
-                scaled = pix.scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                sx = -scaled.width() // 2
-                sy = -scaled.height() // 2
+                dpr = painter.device().devicePixelRatioF() if painter.device() else 1.0
+                target = int(icon_size * dpr)
+                scaled = pix.scaled(target, target, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                scaled.setDevicePixelRatio(dpr)
+                sx = -scaled.width() / dpr / 2
+                sy = -scaled.height() / dpr / 2
                 painter.drawPixmap(int(sx), int(sy), scaled)
                 return
 
@@ -238,7 +236,8 @@ class SkillNode(QGraphicsEllipseItem):
         if self.skill_name:
             zh = get_perk_name_zh(self.skill_name)
             abbrev = zh[:2] if len(zh) >= 2 else (self.skill_name[:2].upper() if self.skill_name else "?")
-            painter.setPen(QColor("#FFFFFF") if self._probability >= 0.50 else QColor("#1C1814"))
+            # 按填充色亮度决定文字颜色,保证两套主题下都可读
+            painter.setPen(QColor("#FFFFFF") if self._color.lightness() < 150 else QColor("#1C1814"))
             f = QFont("Microsoft YaHei", 8, QFont.Bold)
             painter.setFont(f)
             painter.drawText(QRectF(-NODE_RADIUS + 2, -NODE_RADIUS + 2,
@@ -300,10 +299,12 @@ class SkillNode(QGraphicsEllipseItem):
         tw = QLabel()
         tw.setWindowFlags(Qt.ToolTip | Qt.FramelessWindowHint)
         tw.setAttribute(Qt.WA_ShowWithoutActivating)
+        # 深棕底金边,与全局 QToolTip 风格统一
         tw.setStyleSheet(
-            "background: #FFFFF0; border: 2px solid #B8860B; "
+            f"background: {theme.c('tooltip_bg')}; "
+            f"border: 2px solid {theme.c('accent')}; "
             "border-radius: 6px; padding: 10px 12px; "
-            "font-size: 12px; line-height: 1.6; color: #1C1814;")
+            f"font-size: 12px; line-height: 1.6; color: {theme.c('tooltip_text')};")
         tw.setWordWrap(True)
         tw.setMaximumWidth(420)
         tw.setText(self._tooltip_text())
@@ -331,8 +332,31 @@ class ColumnHeaderOverlay(QWidget):
     def __init__(self, view, parent=None):
         super().__init__(parent or view)
         self._view = view
-        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        # 需要接收鼠标移动以显示被省略列名的完整 tooltip
+        # (overlay 位于 viewport 上方边距区,不遮挡场景交互)
+        self.setMouseTracking(True)
         self.setFixedHeight(COL_HEADER_H)
+
+    def _col_at(self, x):
+        """Return column index under overlay-local x, or -1."""
+        tr = self._view.viewportTransform()
+        for col in range(len(self._view._col_headers)):
+            scene_x = float(MATRIX_LEFT + col * CELL_W)
+            vp_x = tr.m11() * scene_x + tr.m31()
+            cx = self._view.viewport().x() + vp_x
+            if cx <= x < cx + CELL_W:
+                return col
+        return -1
+
+    def mouseMoveEvent(self, event):
+        col = self._col_at(event.position().x())
+        if 0 <= col < len(self._view._col_headers):
+            label, prob = self._view._col_headers[col]
+            QToolTip.showText(event.globalPosition().toPoint(),
+                              f"{label}  ({prob*100:.1f}%)", self)
+        else:
+            QToolTip.hideText()
+        super().mouseMoveEvent(event)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -340,12 +364,12 @@ class ColumnHeaderOverlay(QWidget):
         w = self.width()
 
         # ── column header background bar ──
-        painter.fillRect(QRectF(0, 0, w, COL_HEADER_H), QColor("#F2F0E8"))
-        painter.setPen(QPen(QColor("#D0CCC0"), 1))
+        painter.fillRect(QRectF(0, 0, w, COL_HEADER_H), QColor(theme.c("matrix_header_bg")))
+        painter.setPen(QPen(QColor(theme.c("matrix_header_border")), 1))
         painter.drawLine(QPointF(0, COL_HEADER_H - 1), QPointF(w, COL_HEADER_H - 1))
 
         # ── top-left corner patch (row header area) ──
-        painter.fillRect(QRectF(0, 0, ROW_HEADER_W, COL_HEADER_H), QColor("#E8E4D8"))
+        painter.fillRect(QRectF(0, 0, ROW_HEADER_W, COL_HEADER_H), QColor(theme.c("matrix_corner")))
 
         headers = self._view._col_headers
         if not headers:
@@ -354,15 +378,17 @@ class ColumnHeaderOverlay(QWidget):
 
         highlight_col = self._view._highlight_col
         flash_count = self._view._flash_count
+        accent = QColor(theme.c("accent"))
 
         painter.setFont(self._view._hdr_font)
+        fm = painter.fontMetrics()
 
         for col, (label, prob) in enumerate(headers):
             # scene → viewport via transform (float-precise, avoids
             # mapFromScene int truncation), then + viewport.x() → overlay coords.
-            t = self._view.viewportTransform()
+            tr = self._view.viewportTransform()
             scene_x = float(MATRIX_LEFT + col * CELL_W)
-            vp_x = t.m11() * scene_x + t.m31()
+            vp_x = tr.m11() * scene_x + tr.m31()
             x = int(self._view.viewport().x() + vp_x)
 
             # Cull if entirely off-screen
@@ -372,9 +398,9 @@ class ColumnHeaderOverlay(QWidget):
             # highlighted column background
             if col == highlight_col:
                 alpha = 40 if flash_count % 2 == 0 else 10
-                painter.fillRect(
-                    QRectF(x, 0, CELL_W, COL_HEADER_H),
-                    QColor(184, 134, 11, alpha))
+                hl = QColor(accent)
+                hl.setAlpha(alpha)
+                painter.fillRect(QRectF(x, 0, CELL_W, COL_HEADER_H), hl)
 
             # probability color block
             pc = prob_fill_color(prob)
@@ -382,11 +408,13 @@ class ColumnHeaderOverlay(QWidget):
             painter.setPen(QPen(pc.darker(130), 1))
             painter.drawRect(QRectF(x + 4, COL_HEADER_H - 10, 5, 6))
 
-            # column name
-            text_color = QColor("#B8860B") if col == highlight_col else QColor("#333")
+            # column name (elided; full name available via hover tooltip)
+            text_color = accent if col == highlight_col \
+                else QColor(theme.c("matrix_header_text"))
             painter.setPen(text_color)
+            elided = fm.elidedText(label, Qt.ElideRight, CELL_W - 16)
             painter.drawText(QRectF(x + 12, 2, CELL_W - 16, COL_HEADER_H - 8),
-                           Qt.AlignLeft | Qt.AlignVCenter, label)
+                           Qt.AlignLeft | Qt.AlignVCenter, elided)
 
         painter.end()
 
@@ -402,7 +430,7 @@ class SkillTreeView(QGraphicsView):
         self.setDragMode(QGraphicsView.ScrollHandDrag)
         self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
         self.setFrameShape(QGraphicsView.NoFrame)
-        self.setBackgroundBrush(QColor("#FAFAF6"))
+        self.setBackgroundBrush(QColor(theme.c("matrix_bg")))
 
         # Reserve top margin for the column header overlay
         self.setViewportMargins(0, COL_HEADER_H, 0, 0)
@@ -466,7 +494,7 @@ class SkillTreeView(QGraphicsView):
         if not self._col_headers:
             return
         painter.setRenderHint(QPainter.Antialiasing, False)
-        painter.setPen(QPen(QColor("#E0DCD0"), 0.5))
+        painter.setPen(QPen(QColor(theme.c("matrix_grid")), 0.5))
         ncols = len(self._col_headers)
         total_w = MATRIX_LEFT + ncols * CELL_W
         total_h = MATRIX_TOP + 7 * CELL_H
@@ -485,8 +513,9 @@ class SkillTreeView(QGraphicsView):
         painter.setRenderHint(QPainter.Antialiasing, False)
 
         # row header background (viewport height)
-        painter.fillRect(QRectF(0, 0, ROW_HEADER_W, vp.height()), QColor("#F2F0E8"))
-        painter.setPen(QPen(QColor("#D0CCC0"), 1))
+        painter.fillRect(QRectF(0, 0, ROW_HEADER_W, vp.height()),
+                         QColor(theme.c("matrix_header_bg")))
+        painter.setPen(QPen(QColor(theme.c("matrix_header_border")), 1))
         painter.drawLine(QPointF(ROW_HEADER_W, 0), QPointF(ROW_HEADER_W, vp.height()))
 
         # tier row labels
@@ -494,7 +523,7 @@ class SkillTreeView(QGraphicsView):
         labels = self._tier_labels
         for row in range(7):
             y = MATRIX_TOP + row * CELL_H
-            painter.setPen(QColor("#6B6359"))
+            painter.setPen(QColor(theme.c("matrix_row_text")))
             painter.drawText(QRectF(0, y, ROW_HEADER_W, CELL_H),
                            Qt.AlignCenter, labels[row] if row < len(labels) else f"T{row+1}")
 
@@ -509,13 +538,13 @@ class SkillTreeWidget(QWidget):
         self._all_trees = []
         self._active_ids = set()
         self._scene = QGraphicsScene()
-        self._scene.setBackgroundBrush(QColor("#FAFAF6"))
+        self._scene.setBackgroundBrush(QColor(theme.c("matrix_bg")))
         self._view = SkillTreeView(self._scene)
 
         # placeholder hint
         self._placeholder = QLabel(t("st.placeholder"))
+        self._placeholder.setObjectName("placeholder_text")
         self._placeholder.setAlignment(Qt.AlignCenter)
-        self._placeholder.setStyleSheet("color: #A09888; font-size: 14px; padding: 30px;")
 
         # ── Chip bar ──
         self._chip_bar = QWidget()
@@ -525,7 +554,7 @@ class SkillTreeWidget(QWidget):
         chip_layout.setSpacing(4)
 
         self._chip_label = QLabel(t("st.chip_label"))
-        self._chip_label.setStyleSheet("font-size: 12px; color: #6B6359;")
+        self._chip_label.setObjectName("caption_label")
         chip_layout.addWidget(self._chip_label)
 
         # chip container (scrollable)
@@ -544,14 +573,16 @@ class SkillTreeWidget(QWidget):
 
         # "+ Add Group" button
         self._add_btn = QPushButton(t("st.add_btn"))
-        self._add_btn.setObjectName("nav_button")
+        self._add_btn.setObjectName("dashed_btn")
         self._add_btn.setFixedHeight(28)
-        self._add_btn.setStyleSheet(
-            "QPushButton { font-size: 11px; padding: 2px 10px; "
-            "background: transparent; border: 1px dashed #C8BFA8; border-radius: 12px; }"
-            "QPushButton:hover { border-color: #B8860B; color: #B8860B; }")
         self._add_btn.clicked.connect(self._on_add_menu)
         chip_layout.addWidget(self._add_btn)
+
+        # 概率图例:分层色点 + 光环说明
+        self._legend_label = QLabel()
+        self._legend_label.setObjectName("st_legend")
+        self._refresh_legend()
+        chip_layout.addWidget(self._legend_label)
 
         chip_layout.addStretch()
 
@@ -562,6 +593,15 @@ class SkillTreeWidget(QWidget):
         layout.addWidget(self._placeholder)
         layout.addWidget(self._chip_bar)
         layout.addWidget(self._view, 1)
+
+    def _refresh_legend(self):
+        """重建图例 HTML(颜色取当前主题)。"""
+        pal = theme.prob_palette()
+        dots = "".join(
+            f"<span style='color:{col};'>●</span>"
+            f"<span>{label}</span>&nbsp;"
+            for col, label in zip(pal[:4], ["80", "50", "20", "0"]))
+        self._legend_label.setText(f"{dots}｜{t('st.legend')}")
 
     # ── Public API ──────────────────────────────────────────────
 
@@ -574,8 +614,17 @@ class SkillTreeWidget(QWidget):
         self._placeholder.setText(t("st.placeholder"))
         self._chip_label.setText(t("st.chip_label"))
         self._add_btn.setText(t("st.add_btn"))
+        self._refresh_legend()
         # update tier labels in view
         self._view.set_tier_labels(_tier_labels(lang))
+        self._rebuild()
+
+    def retheme(self):
+        """主题切换后重刷矩阵背景与节点颜色。"""
+        bg = QColor(theme.c("matrix_bg"))
+        self._scene.setBackgroundBrush(bg)
+        self._view.setBackgroundBrush(bg)
+        self._refresh_legend()
         self._rebuild()
 
     def set_trees(self, trees, bg_id=None, gd=None):
@@ -683,27 +732,19 @@ class SkillTreeWidget(QWidget):
             pct = int(prob * 100)
 
             chip = QFrame()
+            chip.setObjectName("st_chip")
             chip.setFrameShape(QFrame.StyledPanel)
-            chip.setStyleSheet(
-                "QFrame { background: #F5F0E8; border: 1px solid #DDD6CC; "
-                "border-radius: 12px; padding: 2px; }"
-                "QFrame:hover { border-color: #C8BFA8; }"
-            )
             chip_layout = QHBoxLayout(chip)
             chip_layout.setContentsMargins(8, 1, 4, 1)
             chip_layout.setSpacing(4)
 
             name_lbl = QLabel(f"{gname} {pct}%")
-            name_lbl.setStyleSheet("font-size: 11px; color: #1C1814;")
+            name_lbl.setObjectName("st_chip_label")
             chip_layout.addWidget(name_lbl)
 
             close_btn = QPushButton("×")
+            close_btn.setObjectName("st_chip_close")
             close_btn.setFixedSize(18, 18)
-            close_btn.setStyleSheet(
-                "QPushButton { font-size: 12px; border: none; background: transparent; "
-                "color: #A09888; border-radius: 9px; }"
-                "QPushButton:hover { background: #E8D0D0; color: #C0392B; }"
-            )
             close_btn.clicked.connect(lambda checked, g=gid: self._remove_group(g))
             chip_layout.addWidget(close_btn)
 

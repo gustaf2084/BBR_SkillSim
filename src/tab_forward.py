@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """tab_forward.py - forward simulation page."""
 
-from PySide6.QtCore import QStringListModel, Qt
-from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtCore import QRectF, QStringListModel, Qt
+from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -19,26 +19,22 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
-    QProgressBar,
     QPushButton,
     QScrollArea,
     QSplitter,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
+import theme
 from i18n import cat_name, prob_tier_label, t
 from skill_tree_widget import SkillTreeWidget, build_skill_tree_data
-
-# Category display colors (visual only, not language-specific)
-CAT_COLOR = {
-    "Shared":("#27704B","#FFFFFF"),"Exclusive":("#8B6914","#FFFFFF"),
-    "Weapon":("#5A6B7D","#FFFFFF"),"Armor":("#7B6B5A","#FFFFFF"),
-    "Fighting Style":("#8B1A6B","#FFFFFF"),"Special":("#B8860B","#FFFFFF"),
-    "Always":("#4A4A4A","#FFFFFF"),
-}
+from ui_components import CollapsibleSection, make_placeholder
 
 # v0.3.0: Attribute key mapping for i18n
 _ATTR_I18N = {
@@ -59,8 +55,51 @@ _ATTR_ORDER = [
 ]
 
 
+class ProbBarDelegate(QStyledItemDelegate):
+    """自绘概率条:扁平圆角实色填充,颜色随概率分层、随主题切换。
+
+    数据约定:index.data(Qt.UserRole) = 概率浮点值(0~1)。
+    """
+
+    BAR_HEIGHT = 14
+    H_PAD = 8
+
+    def paint(self, painter, option, index):
+        # 先画默认背景(选中态/交替行色)
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        opt.text = ""
+        style = opt.widget.style() if opt.widget else QApplication.style()
+        style.drawControl(QStyle.CE_ItemViewItem, opt, painter, opt.widget)
+
+        p = index.data(Qt.UserRole)
+        if p is None:
+            return
+        p = max(0.0, min(1.0, float(p)))
+
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing)
+        rect = option.rect
+        y = rect.y() + (rect.height() - self.BAR_HEIGHT) / 2
+        track = QRectF(rect.x() + self.H_PAD, y,
+                       rect.width() - self.H_PAD * 2, self.BAR_HEIGHT)
+        # 轨道
+        painter.setPen(QPen(QColor(theme.c("bar_border")), 1))
+        painter.setBrush(QColor(theme.c("bar_track")))
+        painter.drawRoundedRect(track, 3, 3)
+        # 填充
+        fill_w = (track.width() - 2) * p
+        if fill_w >= 1:
+            fill = QRectF(track.x() + 1, track.y() + 1, fill_w, track.height() - 2)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor(theme.prob_color(p)))
+            painter.drawRoundedRect(fill, 2, 2)
+        painter.restore()
+
+
 class ForwardTab(QWidget):
     TRAIT_COLS = 4
+    TRAIT_MAX = 3
 
     def __init__(self):
         super().__init__()
@@ -107,18 +146,16 @@ class ForwardTab(QWidget):
         self._bg_label = QLabel(t("forward.bg_label"))
         bf.addRow(self._bg_label, self.bg_combo)
 
-        # traits section
-        self._trait_label = QLabel(t("forward.traits_label"))
+        # traits section (label with live n/3 counter)
+        self._trait_label = QLabel(t("forward.traits_count").format(0))
         self._trait_label.setStyleSheet("font-weight:bold;")
         bf.addRow(self._trait_label)
 
         # trait search filter
         self.trait_search = QLineEdit()
+        self.trait_search.setObjectName("search_input")
         self.trait_search.setPlaceholderText(t("forward.trait_search_ph"))
         self.trait_search.setClearButtonEnabled(True)
-        self.trait_search.setStyleSheet(
-            "QLineEdit { padding: 4px 8px; border: 1px solid #DDD6CC; "
-            "border-radius: 4px; background: #FFFEF9; font-size: 12px; }")
         self.trait_search.textChanged.connect(self._on_trait_search)
         bf.addRow(self.trait_search)
 
@@ -136,11 +173,10 @@ class ForwardTab(QWidget):
         self.trait_scroll.setWidget(self.trait_container)
         lv.addWidget(self.trait_scroll, 1)
 
-        # advanced
-        self._adv_grp = QGroupBox(t("forward.advanced"))
-        self._adv_grp.setCheckable(True)
-        self._adv_grp.setChecked(False)
-        af = QFormLayout(self._adv_grp)
+        # advanced (true collapsible section)
+        self._adv_sec = CollapsibleSection(t("forward.advanced"), expanded=False)
+        af = QFormLayout(self._adv_sec.content)
+        af.setContentsMargins(10, 8, 10, 8)
         self.attr_check = QCheckBox(t("forward.use_attr"))
         self.attr_check.setChecked(True)
         self.attr_check.toggled.connect(self._on_attr_toggled)  # v0.3.0
@@ -174,7 +210,7 @@ class ForwardTab(QWidget):
         self.mode_combo.addItem(t("mode.monte"), "monte_carlo")
         self._mode_label = QLabel(t("common.mode_label"))
         af.addRow(self._mode_label, self.mode_combo)
-        lv.addWidget(self._adv_grp)
+        lv.addWidget(self._adv_sec)
 
         # calc button
         self.calc_btn = QPushButton(t("forward.calc_btn"))
@@ -187,11 +223,16 @@ class ForwardTab(QWidget):
         # ===== RIGHT =====
         right = QWidget()
         rv = QVBoxLayout(right)
-        rv.setContentsMargins(0,0,0,0)
+        rv.setContentsMargins(0, 0, 0, 0)
 
         self.result_title = QLabel(t("forward.result_title_ph"))
         self.result_title.setObjectName("page_title")
         rv.addWidget(self.result_title)
+
+        # empty-state guide (shown until the first calculation)
+        self.guide_widget = make_placeholder(
+            t("forward.guide_title"), t("forward.guide_body"))
+        rv.addWidget(self.guide_widget, 1)
 
         self.none_label = QWidget()
         self.none_label.setObjectName("notice_parchment")
@@ -200,8 +241,8 @@ class ForwardTab(QWidget):
         self._none_title_lbl.setObjectName("notice_parchment_title")
         nlv.addWidget(self._none_title_lbl)
         self.none_reason = QLabel("")
+        self.none_reason.setObjectName("notice_parchment_body")
         self.none_reason.setWordWrap(True)
-        self.none_reason.setStyleSheet("font-size:14px;color:#1C1814;padding-top:4px;")
         nlv.addWidget(self.none_reason)
         self.none_label.setVisible(False)
         rv.addWidget(self.none_label)
@@ -239,29 +280,30 @@ class ForwardTab(QWidget):
         # table
         top = QWidget()
         tv = QVBoxLayout(top)
-        tv.setContentsMargins(0,0,0,0)
+        tv.setContentsMargins(0, 0, 0, 0)
         self._table_caption = QLabel(t("forward.table_caption"))
-        self._table_caption.setStyleSheet("font-size:12px;color:#6B6359;padding:2px 6px;")
+        self._table_caption.setObjectName("caption_label")
         tv.addWidget(self._table_caption)
 
-        self.result_table = QTableWidget(0,5)
+        self.result_table = QTableWidget(0, 5)
         self._forward_headers = [
             t("forward.h_icon"), t("forward.h_group"),
             t("forward.h_category"), t("forward.h_probability"),
             t("forward.h_bar"),
         ]
         self.result_table.setHorizontalHeaderLabels(self._forward_headers)
-        self.result_table.horizontalHeader().setSectionResizeMode(0,QHeaderView.Fixed)
-        self.result_table.horizontalHeader().resizeSection(0,50)
-        self.result_table.horizontalHeader().setSectionResizeMode(1,QHeaderView.Stretch)
-        self.result_table.horizontalHeader().setSectionResizeMode(2,QHeaderView.ResizeToContents)
-        self.result_table.horizontalHeader().setSectionResizeMode(3,QHeaderView.ResizeToContents)
-        self.result_table.horizontalHeader().setSectionResizeMode(4,QHeaderView.Stretch)
+        self.result_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.result_table.horizontalHeader().resizeSection(0, 50)
+        self.result_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.result_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.result_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.result_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
         self.result_table.verticalHeader().setVisible(False)
         self.result_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.result_table.setAlternatingRowColors(True)
         self.result_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.result_table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.result_table.setItemDelegateForColumn(4, ProbBarDelegate(self.result_table))
         self.result_table.itemClicked.connect(self._on_table_click)
         tv.addWidget(self.result_table)
 
@@ -269,17 +311,11 @@ class ForwardTab(QWidget):
         export_row = QHBoxLayout()
         export_row.addStretch()
         self.copy_btn = QPushButton(t("forward.copy_btn"))
-        self.copy_btn.setStyleSheet(
-            "QPushButton { padding: 4px 16px; border: 1px solid #BBB; "
-            "border-radius: 4px; font-size: 12px; }"
-            "QPushButton:hover { background: #E8E4DC; }")
+        self.copy_btn.setObjectName("secondary_btn")
         self.copy_btn.clicked.connect(self._copy_as_text)
         export_row.addWidget(self.copy_btn)
         self.export_btn = QPushButton(t("forward.export_btn"))
-        self.export_btn.setStyleSheet(
-            "QPushButton { padding: 4px 16px; border: 1px solid #BBB; "
-            "border-radius: 4px; font-size: 12px; }"
-            "QPushButton:hover { background: #E8E4DC; }")
+        self.export_btn.setObjectName("secondary_btn")
         self.export_btn.clicked.connect(self._export_csv)
         export_row.addWidget(self.export_btn)
         tv.addLayout(export_row)
@@ -288,12 +324,12 @@ class ForwardTab(QWidget):
         # skill tree
         self.skill_tree = SkillTreeWidget(icon_provider=self.icon_provider)
         self.inner_splitter.addWidget(self.skill_tree)
-        self.inner_splitter.setSizes([300,400])
-        rv.addWidget(self.inner_splitter,1)
+        self.inner_splitter.setSizes([300, 400])
+        rv.addWidget(self.inner_splitter, 1)
 
         splitter.addWidget(right)
-        splitter.setSizes([330,850])
-        root.addWidget(splitter,1)
+        splitter.setSizes([330, 850])
+        root.addWidget(splitter, 1)
 
     # ---- data ready ----
 
@@ -330,8 +366,8 @@ class ForwardTab(QWidget):
         self._bg_grp.setTitle(t("forward.char_config"))
         self._bg_label.setText(t("forward.bg_label"))
         self.bg_combo.lineEdit().setPlaceholderText(t("forward.bg_search_ph"))
-        self._trait_label.setText(t("forward.traits_label"))
-        self._adv_grp.setTitle(t("forward.advanced"))
+        self._update_trait_counter()
+        self._adv_sec.set_title(t("forward.advanced"))
         self.attr_check.setText(t("forward.use_attr"))
         self.proj_check.setText(t("forward.use_proj"))
         self._mode_label.setText(t("common.mode_label"))
@@ -344,6 +380,9 @@ class ForwardTab(QWidget):
         self.export_btn.setText(t("forward.export_btn"))
         self._none_title_lbl.setText(t("forward.none_title"))
         self._table_caption.setText(t("forward.table_caption"))
+        self.guide_widget.title_label.setText(t("forward.guide_title"))
+        self.guide_widget.sub_label.setText(t("forward.guide_body"))
+        self.guide_widget.sub_label.setVisible(True)
         # result title: keep placeholder or recompute
         if self._last_results is None:
             self.result_title.setText(t("forward.result_title_ph"))
@@ -372,6 +411,12 @@ class ForwardTab(QWidget):
         bg_id = self.bg_combo.currentData()
         if bg_id:
             self._refresh_attr_panel(bg_id)
+
+    def retheme(self):
+        """主题切换后重刷代码里设置的颜色(表格文字色、技能树等)。"""
+        if self._last_results is not None:
+            self._fill_table(self._last_results)
+        self.skill_tree.retheme()
 
     def _refresh_result_title(self):
         """Rebuild result title from _last_results using current language."""
@@ -403,17 +448,22 @@ class ForwardTab(QWidget):
             self._trait_checkboxes.append(cb)
             r, c = divmod(i, self.TRAIT_COLS)
             self.trait_grid.addWidget(cb, r, c)
+        self._update_trait_counter()
+
+    def _selected_traits(self):
+        return [cb for cb in self._trait_checkboxes if cb.isChecked()]
+
+    def _update_trait_counter(self):
+        self._trait_label.setText(
+            t("forward.traits_count").format(len(self._selected_traits())))
 
     def _on_trait_toggle(self, _checked):
-        selected = [cb for cb in self._trait_checkboxes if cb.isChecked()]
-        if len(selected) > 3:
-            sender = self.sender()
-            if sender and sender.isChecked():
-                sender.blockSignals(True)
-                sender.setChecked(False)
-                sender.blockSignals(False)
-                QMessageBox.warning(self, t("forward.trait_limit_title"),
-                                    t("forward.trait_limit_body"))
+        """达到 3 个上限时禁用未勾选项(替代模态弹窗),并刷新计数。"""
+        at_limit = len(self._selected_traits()) >= self.TRAIT_MAX
+        for cb in self._trait_checkboxes:
+            if not cb.isChecked():
+                cb.setEnabled(not at_limit)
+        self._update_trait_counter()
 
     # ---- v0.3.0: Attribute range panel ----
 
@@ -515,6 +565,10 @@ class ForwardTab(QWidget):
         # v0.3.0: Refresh attribute panel
         self._refresh_attr_panel(bg_id)
 
+        # busy state (计算为同步调用,给出即时按下反馈)
+        self.calc_btn.setEnabled(False)
+        self.calc_btn.setText(t("common.calculating"))
+        QApplication.processEvents()
         try:
             if mode == "monte_carlo":
                 res = self.engine.forward_simulate(
@@ -530,8 +584,12 @@ class ForwardTab(QWidget):
             QMessageBox.critical(self, t("forward.calc_err_title"),
                                  t("forward.calc_err_prefix") + str(e))
             return
+        finally:
+            self.calc_btn.setEnabled(True)
+            self.calc_btn.setText(t("forward.calc_btn"))
 
         self._last_results = res
+        self.guide_widget.setVisible(False)
         self.none_label.setVisible(False)
         self.inner_splitter.setVisible(True)
 
@@ -571,31 +629,24 @@ class ForwardTab(QWidget):
             # category tag
             cat = self.gd.group_category(group) or ""
             cz = cat_name(cat) if cat else cat
-            bgc, txc = CAT_COLOR.get(cat, ("#4A4A4A","#FFFFFF"))
+            bgc = theme.CAT_COLOR.get(cat, theme.CAT_COLOR["Always"])
             ci = QTableWidgetItem(" " + cz + " ")
             ci.setTextAlignment(Qt.AlignCenter)
             ci.setBackground(QBrush(QColor(bgc)))
-            ci.setForeground(QBrush(QColor(txc)))
-            ci.setFont(QFont("Microsoft YaHei",10,QFont.Bold))
+            ci.setForeground(QBrush(QColor("#FFFFFF")))
+            ci.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
             self.result_table.setItem(row, 2, ci)
             # prob
             lbl, color = prob_tier_label(p)
-            pi = QTableWidgetItem(str(int(p*100))+"% ("+lbl+")")
+            pi = QTableWidgetItem(f"{p*100:.1f}% ({lbl})")
             pi.setFont(df)
             pi.setForeground(QBrush(QColor(color)))
             pi.setTextAlignment(Qt.AlignCenter)
             self.result_table.setItem(row, 3, pi)
-            # bar
-            bar = QProgressBar()
-            bar.setRange(0,100)
-            bar.setValue(int(p*100))
-            bar.setFormat("")
-            bar.setTextVisible(False)
-            bar.setStyleSheet(
-                "QProgressBar::chunk{background:"+color+";border-radius:2px;}"
-                "QProgressBar{background:#F0EDE6;border:1px solid #DDD6CC;"
-                "border-radius:3px;min-height:14px;max-height:18px;}")
-            self.result_table.setCellWidget(row, 4, bar)
+            # bar (delegate 自绘,概率存 UserRole)
+            bi = QTableWidgetItem()
+            bi.setData(Qt.UserRole, float(p))
+            self.result_table.setItem(row, 4, bi)
             self.result_table.setRowHeight(row, 38)
 
     def _fill_skill_tree(self, results):
@@ -623,6 +674,12 @@ class ForwardTab(QWidget):
 
     # --- export ---
 
+    def _notify(self, msg):
+        """在主窗口状态栏显示临时反馈。"""
+        w = self.window()
+        if hasattr(w, "statusBar"):
+            w.statusBar().showMessage(msg, 2000)
+
     def _rows_data(self):
         """Yield (group_id, display_name, category, prob) for each non-empty row."""
         for row in range(self.result_table.rowCount()):
@@ -643,6 +700,7 @@ class ForwardTab(QWidget):
         for gid, name, cat, prob_text in self._rows_data():
             lines.append(f"{gid}\t{name}\t{cat}\t{prob_text}")
         QApplication.clipboard().setText("\n".join(lines))
+        self._notify(t("common.copied"))
 
     def _export_csv(self):
         """Save current table as CSV file."""

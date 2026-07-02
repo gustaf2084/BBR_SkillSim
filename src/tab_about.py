@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+import theme
 from i18n import t
 
 
@@ -56,8 +57,8 @@ class AboutTab(QWidget):
 
         # footer
         self._footer = QLabel("")
+        self._footer.setObjectName("placeholder_sub")
         self._footer.setAlignment(Qt.AlignCenter)
-        self._footer.setStyleSheet("font-size: 11px; color: #A09888; padding: 12px;")
         self._footer.setWordWrap(True)
         v.addWidget(self._footer)
 
@@ -74,8 +75,7 @@ class AboutTab(QWidget):
 
         content = QLabel("")
         content.setWordWrap(True)
-        content.setStyleSheet("font-size: 12px; color: #1C1814; line-height: 1.6;")
-        content.setObjectName(f"card_{card_id}")
+        content.setObjectName("card_body")
         clv.addWidget(content, 1)
 
         setattr(self, f"_card_{card_id}", content)
@@ -93,6 +93,30 @@ class AboutTab(QWidget):
         self._card_title_features.setText(t("about.card_features"))
         self._card_title_legend.setText(t("about.card_legend"))
         self._refresh_content()
+
+    def retheme(self):
+        """主题切换后重建图例卡(颜色取自当前主题)。"""
+        self._refresh_content()
+
+    def _legend_html(self):
+        """运行时生成图例 HTML,颜色注入当前主题的概率分层色。"""
+        pal = theme.prob_palette()
+        rows = [
+            (pal[0], t("about.legend_high"), t("about.legend_high_d")),
+            (pal[1], t("about.legend_likely"), t("about.legend_likely_d")),
+            (pal[2], t("about.legend_chance"), t("about.legend_chance_d")),
+            (pal[3], t("about.legend_low"), t("about.legend_low_d")),
+            (pal[4], t("about.legend_none"), t("about.legend_none_d")),
+        ]
+        html = "".join(
+            f"<p style='color:{color};'>● <b>{label}</b> — {desc}</p>"
+            for color, label, desc in rows)
+        html += (
+            f"<p style='font-size:11px; color:{theme.c('text_muted')}; margin-top:8px;'>"
+            f"◎ {t('about.legend_halo')}</p>"
+            f"<p style='font-size:11px; color:{theme.c('text_faint')};'>"
+            f"{t('about.legend_tip')}</p>")
+        return html
 
     def _refresh_content(self):
         if self.gd is None:
@@ -112,14 +136,14 @@ class AboutTab(QWidget):
             f"{t('about.data_skill_pts').format(gd.skill_points)}）</p>"
         )
         if inc:
-            data_text += "<p style='font-size:11px; color:#8B8378;'>"
+            data_text += f"<p style='font-size:11px; color:{theme.c('text_faint')};'>"
             data_text += f"{t('about.data_hidden')}{', '.join(inc[:10])}"
             if len(inc) > 10:
                 data_text += f" …{t('about.data_bg_incomplete')}{len(inc)} "
             data_text += "</p>"
         if gd.warnings:
             data_text += (
-                f"<p style='font-size:11px; color:#A0522D;'>"
+                f"<p style='font-size:11px; color:{theme.c('error_border')};'>"
                 f"{t('about.data_warnings').format(len(gd.warnings))}</p>"
             )
         self._card_data_info.setText(data_text)
@@ -127,5 +151,5 @@ class AboutTab(QWidget):
         # card 2: features
         self._card_features.setText(t("about.features_text"))
 
-        # card 3: legend
-        self._card_legend.setText(t("about.legend_text"))
+        # card 3: legend (运行时生成,颜色随主题)
+        self._card_legend.setText(self._legend_html())

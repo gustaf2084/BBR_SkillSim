@@ -15,18 +15,21 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPushButton,
     QScrollArea,
     QSplitter,
+    QStyle,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
 
+import theme
 from build_parser import create_example_file, generate_template, scan_builds
 from i18n import t
 from skill_tree_widget import SkillTreeWidget, build_skill_tree_data
@@ -69,6 +72,14 @@ class BuildsTab(QWidget):
         self._bg_label.setObjectName("section_title")
         lv.addWidget(self._bg_label)
 
+        # background filter box
+        self.bg_search = QLineEdit()
+        self.bg_search.setObjectName("search_input")
+        self.bg_search.setPlaceholderText(t("builds.bg_search_ph"))
+        self.bg_search.setClearButtonEnabled(True)
+        self.bg_search.textChanged.connect(self._on_bg_search)
+        lv.addWidget(self.bg_search)
+
         self.bg_list = QListWidget()
         self.bg_list.currentItemChanged.connect(self._on_bg_changed)
         lv.addWidget(self.bg_list, 1)
@@ -100,7 +111,7 @@ class BuildsTab(QWidget):
         tag_layout.setSpacing(4)
 
         self._build_tag_lbl = QLabel(t("builds.custom_label"))
-        self._build_tag_lbl.setStyleSheet("font-size: 12px; font-weight: bold; color: #6B6359;")
+        self._build_tag_lbl.setObjectName("caption_label")
         tag_layout.addWidget(self._build_tag_lbl)
 
         self.tag_scroll = QScrollArea()
@@ -118,27 +129,19 @@ class BuildsTab(QWidget):
 
         # button group
         self.new_btn = QPushButton(t("builds.new_btn"))
-        self.new_btn.setStyleSheet(
-            "QPushButton { font-size: 11px; padding: 2px 10px; "
-            "background: transparent; border: 1px dashed #C8BFA8; border-radius: 12px; }"
-            "QPushButton:hover { border-color: #B8860B; color: #B8860B; }")
+        self.new_btn.setObjectName("dashed_btn")
         self.new_btn.clicked.connect(self._on_new_build)
         tag_layout.addWidget(self.new_btn)
 
         self.edit_btn = QPushButton(t("builds.edit_btn"))
-        self.edit_btn.setStyleSheet(
-            "QPushButton { font-size: 11px; padding: 2px 8px; "
-            "background: transparent; border: 1px solid #DDD6CC; border-radius: 4px; }"
-            "QPushButton:hover { border-color: #C8BFA8; }")
+        self.edit_btn.setObjectName("tool_btn")
         self.edit_btn.clicked.connect(self._on_edit_build)
         tag_layout.addWidget(self.edit_btn)
 
-        self.folder_btn = QPushButton("📂")
+        self.folder_btn = QPushButton()
+        self.folder_btn.setObjectName("tool_btn")
+        self.folder_btn.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon))
         self.folder_btn.setToolTip(t("builds.folder_tip"))
-        self.folder_btn.setStyleSheet(
-            "QPushButton { font-size: 11px; padding: 2px 6px; "
-            "background: transparent; border: 1px solid #DDD6CC; border-radius: 4px; }"
-            "QPushButton:hover { border-color: #C8BFA8; }")
         self.folder_btn.clicked.connect(self._on_open_folder)
         tag_layout.addWidget(self.folder_btn)
 
@@ -152,9 +155,7 @@ class BuildsTab(QWidget):
 
         # recommended traits hint
         self.build_traits_hint = QLabel("")
-        self.build_traits_hint.setStyleSheet(
-            "font-size: 12px; color: #8B6914; background: #FDF8F0; "
-            "padding: 4px 10px; border-radius: 4px; font-weight: bold;")
+        self.build_traits_hint.setObjectName("traits_hint")
         self.build_traits_hint.setVisible(False)
         bdv.addWidget(self.build_traits_hint)
 
@@ -179,10 +180,8 @@ class BuildsTab(QWidget):
 
         # playstyle suggestions
         self.playstyle_text = QLabel("")
+        self.playstyle_text.setObjectName("playstyle_box")
         self.playstyle_text.setWordWrap(True)
-        self.playstyle_text.setStyleSheet(
-            "font-size: 12px; color: #1C1814; padding: 8px; "
-            "background: #FAFAF6; border-radius: 4px; line-height: 1.6;")
         self.playstyle_text.setVisible(False)
         bdv.addWidget(self.playstyle_text)
 
@@ -211,9 +210,7 @@ class BuildsTab(QWidget):
 
         # ── guide hint (when no custom builds) ──
         self.guide_hint = QLabel(t("builds.guide"))
-        self.guide_hint.setStyleSheet(
-            "font-size: 12px; color: #6B6359; padding: 6px 12px; "
-            "background: #F5F0E8; border-radius: 4px;")
+        self.guide_hint.setObjectName("hint_box")
         self.guide_hint.setVisible(False)
         rv.addWidget(self.guide_hint)
 
@@ -235,7 +232,7 @@ class BuildsTab(QWidget):
         clv.addWidget(title)
         content = QLabel(t("builds.card_ph"))
         content.setWordWrap(True)
-        content.setStyleSheet("font-size: 12px; color: #6B6359; line-height: 1.5;")
+        content.setObjectName("card_body")
         content.setMinimumHeight(60)
         clv.addWidget(content, 1)
         card.setProperty("card_content", content)
@@ -248,6 +245,7 @@ class BuildsTab(QWidget):
     def retranslate(self):
         """Refresh all static text to current language."""
         self._bg_label.setText(t("builds.bg_label"))
+        self.bg_search.setPlaceholderText(t("builds.bg_search_ph"))
         self._build_tag_lbl.setText(t("builds.custom_label"))
         self.new_btn.setText(t("builds.new_btn"))
         self.edit_btn.setText(t("builds.edit_btn"))
@@ -275,6 +273,23 @@ class BuildsTab(QWidget):
         # refresh current build detail
         if self._current_build_idx >= 0 and self._current_build_idx < len(self._builds_data):
             self._show_build_detail(self._builds_data[self._current_build_idx])
+
+    def retheme(self):
+        """主题切换后重刷代码里设置的颜色。"""
+        if self._last_results is not None:
+            self._refresh_auto_cards(self._last_results)
+        if self._current_build_idx >= 0 and self._current_build_idx < len(self._builds_data):
+            self._show_build_detail(self._builds_data[self._current_build_idx])
+        self.skill_tree.retheme()
+
+    # ── background filter ────────────────────────────────────────
+
+    def _on_bg_search(self, text):
+        """Filter the background list by search text."""
+        q = text.strip().lower()
+        for i in range(self.bg_list.count()):
+            item = self.bg_list.item(i)
+            item.setHidden(bool(q) and q not in item.text().lower())
 
     # ── data ready ──────────────────────────────────────────────
 
@@ -376,14 +391,7 @@ class BuildsTab(QWidget):
         for g, p in top10:
             gname = self.gd.group_name(g)
             pct = int(p * 100)
-            if p >= 0.80:
-                color = "#27704B"
-            elif p >= 0.50:
-                color = "#A0522D"
-            elif p >= 0.20:
-                color = "#5A6B7D"
-            else:
-                color = "#8B8378"
+            color = theme.prob_color(p)
             html_parts.append(
                 f"<span style='display:inline-block; margin:2px 4px; padding:2px 6px; "
                 f"border:1px solid {color}; border-radius:4px; font-size:11px; "
@@ -432,13 +440,8 @@ class BuildsTab(QWidget):
 
         for i, bd in enumerate(self._builds_data):
             btn = QPushButton(bd.name)
+            btn.setObjectName("chip_btn")
             btn.setCheckable(True)
-            btn.setStyleSheet(
-                "QPushButton { font-size: 11px; padding: 3px 10px; "
-                "background: #F5F0E8; border: 1px solid #DDD6CC; border-radius: 12px; }"
-                "QPushButton:hover { border-color: #C8BFA8; }"
-                "QPushButton:checked { background: #B8860B; color: #FFFFFF; "
-                "border-color: #9A6F09; }")
             btn.clicked.connect(lambda checked, idx=i: self._select_build(idx))
             self._build_tag_btns.append(btn)
             self.tag_layout_inner.addWidget(btn)
@@ -499,17 +502,18 @@ class BuildsTab(QWidget):
             prob_item.setTextAlignment(Qt.AlignCenter)
 
             if prob < 0.20 and prob > 0:
-                prob_item.setForeground(QBrush(QColor("#C0392B")))
+                prob_item.setForeground(QBrush(QColor(theme.c("error_border"))))
                 tip = t("builds.perk_low_tip").replace("{group}", gname)
                 prob_item.setToolTip(tip)
                 prob_item.setText(f"{prob*100:.1f}% ⚠")
             elif prob >= 0.80:
-                prob_item.setForeground(QBrush(QColor("#27704B")))
+                prob_item.setForeground(QBrush(QColor(theme.prob_color(prob))))
             self.perk_table.setItem(row, 4, prob_item)
 
             self.perk_table.setRowHeight(row, 28)
 
         # Playstyle
+        self.playstyle_text.setProperty("error", False)
         if bd.playstyle.strip():
             self.playstyle_text.setText(bd.playstyle.strip())
             self.playstyle_text.setVisible(True)
@@ -520,10 +524,11 @@ class BuildsTab(QWidget):
         if bd.parse_errors:
             err_text = t("builds.parse_err_prefix") + "\n" + "\n".join(bd.parse_errors[:5])
             self.playstyle_text.setText(err_text)
-            self.playstyle_text.setStyleSheet(
-                "font-size: 11px; color: #C0392B; padding: 8px; "
-                "background: #FDF0F0; border-radius: 4px;")
+            self.playstyle_text.setProperty("error", True)
             self.playstyle_text.setVisible(True)
+        # 属性变化后需要 repolish 让 QSS 的 [error="true"] 选择器生效
+        self.playstyle_text.style().unpolish(self.playstyle_text)
+        self.playstyle_text.style().polish(self.playstyle_text)
 
     def _clear_build_detail(self):
         self.build_traits_hint.setVisible(False)

@@ -13,6 +13,7 @@ import traceback
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+import theme
 from i18n import t
 
 
@@ -37,16 +38,15 @@ def locate_data_json():
     return external
 
 
-def load_stylesheet():
-    """Load global QSS stylesheet. Prefer exe-adjacent style.qss."""
-    here = get_app_dir()
-    qss_path = os.path.join(here, "style.qss")
-    if not os.path.isfile(qss_path):
-        # dev mode: load from src directory
-        qss_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.qss")
+def load_user_qss_override():
+    """exe 同级的 style.qss 为用户自定义覆盖层,追加在生成的主题 QSS 之后。"""
+    qss_path = os.path.join(get_app_dir(), "style.qss")
     if os.path.isfile(qss_path):
-        with open(qss_path, "r", encoding="utf-8") as f:
-            return f.read()
+        try:
+            with open(qss_path, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception:
+            pass
     return ""
 
 
@@ -57,10 +57,11 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("BBR Skill Simulator")
 
-    # Load global stylesheet
-    qss = load_stylesheet()
-    if qss:
-        app.setStyleSheet(qss)
+    # Theme: read saved preference before building any UI
+    from data_loader import _load_settings
+    settings = _load_settings(get_app_dir())
+    theme.set_theme(settings.get("theme", "light"))
+    app.setStyleSheet(theme.build_qss() + "\n" + load_user_qss_override())
 
     # Global exception hook: show dialog instead of crashing silently
     def global_excepthook(exc_type, exc_value, exc_tb):

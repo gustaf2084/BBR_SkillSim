@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""main_window.py - left nav + right stacked pages + language toggle."""
+"""main_window.py - left nav + right stacked pages + language/theme toggle."""
 
 import os
 import sys
@@ -8,6 +8,7 @@ import traceback
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -21,10 +22,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+import theme
 from data_loader import _load_settings, _save_settings, load_data
 from engine import SkillEngine
 from i18n import set_lang as i18n_set_lang
+from i18n import t
 from icon_provider import IconProvider
+
+NAV_ICONS = ["▶", "◀", "☰", "ⓘ"]
+NAV_KEYS = ["nav.forward", "nav.reverse", "nav.builds", "nav.about"]
 
 
 def _read_version():
@@ -51,20 +57,33 @@ def exe_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
-class MainWindow(QMainWindow):
+def _user_qss_override():
+    """exe 同级 style.qss 作为用户自定义覆盖层(可选)。"""
+    qss_path = os.path.join(exe_dir(), "style.qss")
+    if os.path.isfile(qss_path):
+        try:
+            with open(qss_path, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception:
+            pass
+    return ""
 
-    NAV_ITEMS = [
-        ("forward", "Forward Sim"),
-        ("reverse", "Reverse Derive"),
-        ("builds", "Builds"),
-        ("about", "About"),
-    ]
+
+def apply_app_theme():
+    """按当前 theme 状态重建并应用全局 QSS。"""
+    app = QApplication.instance()
+    if app is not None:
+        app.setStyleSheet(theme.build_qss() + "\n" + _user_qss_override())
+
+
+class MainWindow(QMainWindow):
 
     def __init__(self, data_path=None):
         super().__init__()
         self._version = _read_version()
         self.setWindowTitle(f"BBR Skill Simulator v{self._version}")
         self.resize(1180, 760)
+        self.setMinimumSize(960, 640)
         self.init_errors = []
         self._data_error = None
 
@@ -124,6 +143,8 @@ class MainWindow(QMainWindow):
         _save_settings(exe_dir(), s)
         super().closeEvent(event)
 
+    # ── language toggle ───────────────────────────────────────────
+
     def _toggle_lang(self):
         if self.gd is None:
             return
@@ -139,38 +160,68 @@ class MainWindow(QMainWindow):
             pass
         self.gd.set_lang(nl)
         self._update_nav_labels()
-        # refresh language button text & tooltip
-        if hasattr(self, "lang_btn"):
-            self.lang_btn.setText("English" if nl == "zh" else "中文")
-            self.lang_btn.setToolTip("切换到 English" if nl == "zh" else "Switch to 中文")
+        self._update_foot_buttons()
         # retranslate + data refresh for all tabs
-        for pg in [getattr(self, "forward_tab", None),
-                   getattr(self, "reverse_tab", None),
-                   getattr(self, "builds_tab", None),
-                   getattr(self, "about_tab", None)]:
-            if pg is None:
-                continue
+        for pg in self._tabs():
             if hasattr(pg, "retranslate"):
                 try:
                     pg.retranslate()
                 except Exception:
                     pass
-        for pg in [getattr(self, "forward_tab", None),
-                   getattr(self, "reverse_tab", None),
-                   getattr(self, "builds_tab", None)]:
-            if pg and hasattr(pg, "on_data_ready"):
+        for pg in self._tabs(include_about=False):
+            if hasattr(pg, "on_data_ready"):
                 try:
                     pg.on_data_ready(self.gd, self.engine, self.icon_provider)
                 except Exception:
                     pass
         self._build_statusbar()
 
+    # ── theme toggle ──────────────────────────────────────────────
+
+    def _toggle_theme(self):
+        new_name = "light" if theme.is_dark() else "dark"
+        theme.set_theme(new_name)
+        try:
+            s = _load_settings(exe_dir())
+            s["theme"] = new_name
+            _save_settings(exe_dir(), s)
+        except Exception:
+            pass
+        apply_app_theme()
+        self._update_foot_buttons()
+        # 让各页重刷代码里设置的颜色(表格文字色、技能树矩阵等)
+        for pg in self._tabs():
+            if hasattr(pg, "retheme"):
+                try:
+                    pg.retheme()
+                except Exception:
+                    pass
+
+    def _tabs(self, include_about=True):
+        names = ["forward_tab", "reverse_tab", "builds_tab"]
+        if include_about:
+            names.append("about_tab")
+        return [getattr(self, n) for n in names if getattr(self, n, None) is not None]
+
     def _update_nav_labels(self):
-        zh = ["正向模拟", "反向推导", "流派推荐", "关于"]
-        en = ["Forward Sim", "Reverse Derive", "Builds", "About"]
-        labels = zh if self.lang == "zh" else en
-        for i in range(min(len(labels), self.nav.count())):
-            self.nav.item(i).setText(labels[i])
+        for i in range(min(len(NAV_KEYS), self.nav.count())):
+            self.nav.item(i).setText(f"{NAV_ICONS[i]}  {t(NAV_KEYS[i])}")
+        self.nav_title.setText(t("nav.title"))
+
+    def _update_foot_buttons(self):
+        """刷新导航底部语言/主题按钮的文字与提示。"""
+        # 语言按钮显示目标语言
+        self.lang_btn.setText("English" if self.lang == "zh" else "中文")
+        self.lang_btn.setToolTip("切换到 English" if self.lang == "zh" else "Switch to 中文")
+        # 主题按钮显示目标主题
+        if theme.is_dark():
+            self.theme_btn.setText("☀ " + t("theme.to_light"))
+            self.theme_btn.setToolTip(t("theme.tip_light"))
+        else:
+            self.theme_btn.setText("🌙 " + t("theme.to_dark"))
+            self.theme_btn.setToolTip(t("theme.tip_dark"))
+
+    # ── UI construction ───────────────────────────────────────────
 
     def _build_ui(self):
         central = QWidget()
@@ -188,49 +239,44 @@ class MainWindow(QMainWindow):
         nl.setSpacing(0)
         nl.addSpacing(10)
 
-        ttl = QLabel("Skill Simulator")
-        ttl.setObjectName("nav_button")
+        self.nav_title = QLabel(t("nav.title"))
+        self.nav_title.setObjectName("nav_title")
         f = QFont()
         f.setPointSize(14)
         f.setBold(True)
-        ttl.setFont(f)
-        ttl.setStyleSheet("border-left:3px solid #B8860B;padding-left:11px;")
-        nl.addWidget(ttl)
+        self.nav_title.setFont(f)
+        nl.addWidget(self.nav_title)
         nl.addSpacing(12)
 
-        # use QListWidget for reliable nav
         self.nav = QListWidget()
-        self.nav.setObjectName("nav_panel")
-        self.nav.setStyleSheet(
-            "QListWidget{background:#2C2416;border:none;color:#C8BFA8;font-size:14px;font-weight:bold;}"
-            "QListWidget::item{padding:10px 14px;border-left:3px solid transparent;}"
-            "QListWidget::item:hover{background:#3A3024;color:#E0D8C0;}"
-            "QListWidget::item:selected{background:#3A3024;color:#C8BFA8;border-left:3px solid #B8860B;}"
-        )
-        zh = ["正向模拟", "反向推导", "流派推荐", "关于"]
-        en = ["Forward Sim", "Reverse Derive", "Builds", "About"]
-        labels = zh if self.lang == "zh" else en
-        for key, _ in self.NAV_ITEMS:
-            item = QListWidgetItem(labels[self.nav.count()])
+        self.nav.setObjectName("nav_list")
+        for i, key in enumerate(NAV_KEYS):
+            item = QListWidgetItem(f"{NAV_ICONS[i]}  {t(key)}")
             item.setData(Qt.UserRole, key)
             self.nav.addItem(item)
         self.nav.setCurrentRow(0)
         self.nav.currentRowChanged.connect(self._on_nav)
         nl.addWidget(self.nav, 1)
 
-        # lang toggle + version at bottom
+        # bottom: theme + lang toggles, then version
         nl.addSpacing(6)
-        # show target language: Chinese UI shows "English", English UI shows "中文"
-        lt = "English" if self.lang == "zh" else "中文"
-        self.lang_btn = QPushButton(lt)
-        self.lang_btn.setToolTip("切换到 English" if self.lang == "zh" else "Switch to 中文")
+        self.theme_btn = QPushButton()
+        self.theme_btn.setObjectName("nav_foot_btn")
+        self.theme_btn.setCursor(Qt.PointingHandCursor)
+        self.theme_btn.clicked.connect(self._toggle_theme)
+        nl.addWidget(self.theme_btn)
+
+        self.lang_btn = QPushButton()
+        self.lang_btn.setObjectName("nav_foot_btn")
         self.lang_btn.setCursor(Qt.PointingHandCursor)
-        self.lang_btn.setStyleSheet(
-            "QPushButton{font-size:11px;color:#9B9285;border:1px solid #3A3024;"
-            "border-radius:4px;padding:2px 8px;margin:4px 14px;min-width:72px;}"
-            "QPushButton:hover{color:#C8BFA8;border-color:#B8860B;}")
         self.lang_btn.clicked.connect(self._toggle_lang)
         nl.addWidget(self.lang_btn)
+        self._update_foot_buttons()
+
+        nl.addSpacing(6)
+        version_lbl = QLabel(f"v{self._version}")
+        version_lbl.setObjectName("nav_version")
+        nl.addWidget(version_lbl)
 
         layout.addWidget(nav_panel)
 
@@ -272,7 +318,7 @@ class MainWindow(QMainWindow):
         lay = QVBoxLayout(w)
         lay.setAlignment(Qt.AlignCenter)
         tt = QLabel("DATA LOAD FAILED")
-        tt.setStyleSheet("font-size:22px;font-weight:bold;color:#c0392b;")
+        tt.setStyleSheet(f"font-size:22px;font-weight:bold;color:{theme.c('error_border')};")
         tt.setAlignment(Qt.AlignCenter)
         lay.addWidget(tt)
         detail = self._data_error or "(no details)"
@@ -283,7 +329,7 @@ class MainWindow(QMainWindow):
         m.setMaximumWidth(750)
         lay.addWidget(m)
         hint = QLabel("Put data.json next to the exe and restart.")
-        hint.setStyleSheet("font-size:13px;color:#555;padding:10px;")
+        hint.setStyleSheet(f"font-size:13px;color:{theme.c('text_muted')};padding:10px;")
         hint.setAlignment(Qt.AlignCenter)
         lay.addWidget(hint)
         b = QPushButton("Retry")
@@ -310,9 +356,12 @@ class MainWindow(QMainWindow):
         self._build_statusbar()
 
     def _build_statusbar(self):
+        """状态栏:右侧常驻数据版本,左侧留给临时反馈消息(如「已复制」)。"""
         sb = QStatusBar()
         self.setStatusBar(sb)
-        sb.showMessage(f"v{self._version}", 0)
+        if self.gd is not None:
+            info = QLabel(t("status.data_version") + str(getattr(self.gd, "version", "?")))
+            sb.addPermanentWidget(info)
 
     def _on_nav(self, row):
         self.stack.setCurrentIndex(row)

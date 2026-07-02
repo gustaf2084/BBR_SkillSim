@@ -7,6 +7,8 @@ Usage:
     set_lang("en")  # switch to English
 """
 
+import theme
+
 # ── Translation dictionary ──────────────────────────────────────
 
 _TR = {}
@@ -48,9 +50,30 @@ _add("common.ok",            "确定",               "OK")
 _add("common.notice",        "提示",               "Notice")
 _add("common.error",         "错误",               "Error")
 _add("common.mode_label",    "计算模式:",           "Mode:")
+_add("common.copied",        "已复制到剪贴板",       "Copied to clipboard")
+_add("common.cancel",        "取消",               "Cancel")
+_add("common.calculating",   "计算中…",             "Calculating...")
+
+# ── nav / window chrome ──
+_add("nav.title",       "技能模拟器",   "Skill Simulator")
+_add("nav.forward",     "正向模拟",     "Forward Sim")
+_add("nav.reverse",     "反向推导",     "Reverse Derive")
+_add("nav.builds",      "流派推荐",     "Builds")
+_add("nav.about",       "关于",         "About")
+_add("theme.to_dark",   "深色模式",     "Dark Mode")
+_add("theme.to_light",  "浅色模式",     "Light Mode")
+_add("theme.tip_dark",  "切换到深色主题", "Switch to dark theme")
+_add("theme.tip_light", "切换到浅色主题", "Switch to light theme")
+_add("status.data_version", "数据版本 ", "Data version ")
 
 # ── forward tab ──
 _add("forward.char_config",   "角色配置",            "Character Setup")
+_add("forward.traits_count",  "特性 (已选 {0}/3):",   "Traits (selected {0}/3):")
+_add("forward.guide_title",   "开始你的第一次模拟",    "Start your first simulation")
+_add("forward.guide_body",
+      "① 在左侧选择背景　→　② 勾选特性(可选,最多 3 个)　→　③ 点击「计算概率分布」",
+      "1. Pick a background on the left   2. Check traits (optional, max 3)   "
+      "3. Click \"Calculate Distribution\"")
 _add("forward.bg_search_ph",  "输入搜索背景...",      "Type to search backgrounds...")
 _add("forward.bg_label",      "背景:",               "Background:")
 _add("forward.traits_label",  "特性 (最多3个):",       "Traits (max 3):")
@@ -141,12 +164,21 @@ _add("reverse.dlg_h_group",   "技能树组",              "Skill Tree Group")
 _add("reverse.dlg_h_category","类别",                  "Category")
 _add("reverse.dlg_h_prob",    "出现概率",              "Probability")
 _add("reverse.search_ph",     "搜索组...",             "Search groups...")
+_add("reverse.hint_dblclick", "💡 双击结果行可查看该组合的完整概率分布",
+      "💡 Double-click a row to view the full probability distribution")
+_add("reverse.progress_bg",   "正在处理背景 {0}/{1}…",  "Processing background {0}/{1}...")
+_add("reverse.guide_title",   "从目标倒推最佳选人",     "Work backwards from your target")
+_add("reverse.guide_body",
+      "① 展开左侧类别面板,勾选目标技能树组(可多选)　→　② 点击「推导最佳组合」",
+      "1. Expand a category panel and check target groups   "
+      "2. Click \"Derive Best Combos\"")
 _add("reverse.copy_btn",      "复制文本",              "Copy Text")
 _add("reverse.export_btn",    "导出CSV",               "Export CSV")
 _add("reverse.export_title",  "导出反向推导结果",       "Export Reverse Results")
 
 # ── builds tab ──
 _add("builds.bg_label",       "选择背景:",              "Select background:")
+_add("builds.bg_search_ph",   "筛选背景...",            "Filter backgrounds...")
 _add("builds.custom_label",   "自定义流派：",           "Custom Builds:")
 _add("builds.new_btn",        "+ 新建流派",             "+ New Build")
 _add("builds.edit_btn",       "编辑",                   "Edit")
@@ -207,21 +239,23 @@ _add("about.features_text",
       "background+trait combos that maximize their probability. Work backwards from your needs.</p>"
       "<p><b>Builds</b> — auto-analyze each background's skill tree tendencies, "
       "with support for custom build files (builds/*.txt) for editing and sharing.</p>")
-_add("about.legend_text",
-      "<p style='color:#27704B;'>● <b>大概率 ≥80%</b> — 几乎必然出现</p>"
-      "<p style='color:#A0522D;'>● <b>较可能 50–80%</b> — 多数情况出现</p>"
-      "<p style='color:#5A6B7D;'>● <b>看运气 20–50%</b> — 有希望但不稳</p>"
-      "<p style='color:#8B8378;'>● <b>小概率 &lt;20%</b> — 不推荐依赖</p>"
-      "<p style='color:#B0B0B0;'>● <b>不出现 =0</b> — 无法生成</p>"
-      "<p style='font-size:11px; color:#8B8378; margin-top:8px;'>"
-      "提示：高概率不一定好（你可能不想要该组），低概率不一定坏（出了是惊喜）。</p>",
-      "<p style='color:#27704B;'>● <b>Very Likely ≥80%</b> — almost certain to appear</p>"
-      "<p style='color:#A0522D;'>● <b>Likely 50–80%</b> — usually appears</p>"
-      "<p style='color:#5A6B7D;'>● <b>Uncertain 20–50%</b> — possible but unreliable</p>"
-      "<p style='color:#8B8378;'>● <b>Unlikely &lt;20%</b> — don't rely on it</p>"
-      "<p style='color:#B0B0B0;'>● <b>None =0</b> — cannot be generated</p>"
-      "<p style='font-size:11px; color:#8B8378; margin-top:8px;'>"
-      "Tip: high probability isn't always good (you may not want that group), low isn't always bad (a pleasant surprise).</p>")
+_add("about.legend_high",   "大概率 ≥80%",  "Very Likely ≥80%")
+_add("about.legend_high_d", "几乎必然出现",  "almost certain to appear")
+_add("about.legend_likely",   "较可能 50–80%", "Likely 50–80%")
+_add("about.legend_likely_d", "多数情况出现",  "usually appears")
+_add("about.legend_chance",   "看运气 20–50%", "Uncertain 20–50%")
+_add("about.legend_chance_d", "有希望但不稳",  "possible but unreliable")
+_add("about.legend_low",   "小概率 <20%", "Unlikely <20%")
+_add("about.legend_low_d", "不推荐依赖",   "don't rely on it")
+_add("about.legend_none",   "不出现 =0", "None =0")
+_add("about.legend_none_d", "无法生成",  "cannot be generated")
+_add("about.legend_halo",
+      "技能树节点外圈的光环弧长 = 该组出现概率(整圈 = 100%)。",
+      "The halo arc around each skill node = the group's probability (full circle = 100%).")
+_add("about.legend_tip",
+      "提示：高概率不一定好（你可能不想要该组），低概率不一定坏（出了是惊喜）。",
+      "Tip: high probability isn't always good (you may not want that group), "
+      "low isn't always bad (a pleasant surprise).")
 
 # ── skill tree widget ──
 _add("st.placeholder",    "请选择一个背景并点击计算概率分布",
@@ -229,6 +263,7 @@ _add("st.placeholder",    "请选择一个背景并点击计算概率分布",
 _add("st.chip_label",     "技能组：",                  "Skill Groups: ")
 _add("st.add_btn",        "+ 添加组",                   "+ Add Group")
 _add("st.all_shown",      "（所有组已显示）",           "(All groups shown)")
+_add("st.legend",         "光环弧长 = 出现概率",        "Halo arc = probability")
 _add("st.tier1", "1阶", "Tier 1")
 _add("st.tier2", "2阶", "Tier 2")
 _add("st.tier3", "3阶", "Tier 3")
@@ -283,26 +318,28 @@ def cat_name(cat_en):
 
 # ── Convenience: probability tier label ──
 def prob_tier_label(p):
-    """Return (label, color) for a probability value."""
+    """Return (label, color) for a probability value. Color follows the active theme."""
+    color = theme.prob_color(p)
     if p >= 0.80:
-        return t("prob.high"), "#27704B"
+        return t("prob.high"), color
     if p >= 0.50:
-        return t("prob.likely"), "#A0522D"
+        return t("prob.likely"), color
     if p >= 0.20:
-        return t("prob.chance"), "#5A6B7D"
+        return t("prob.chance"), color
     if p > 0:
-        return t("prob.low"), "#8B8378"
-    return t("prob.none"), "#B0B0B0"
+        return t("prob.low"), color
+    return t("prob.none"), color
 
 
 def prob_tier_metal(p):
     """Return (label, color, metal_tag) for probability - reverse tab style."""
+    color = theme.prob_color(p)
     if p >= 0.80:
-        return t("prob.high"), "#27704B", "gold"
+        return t("prob.high"), color, "gold"
     if p >= 0.50:
-        return t("prob.likely"), "#A0522D", "copper"
+        return t("prob.likely"), color, "copper"
     if p >= 0.20:
-        return t("prob.chance"), "#5A6B7D", "iron"
+        return t("prob.chance"), color, "iron"
     if p > 0:
-        return t("prob.low"), "#8B8378", "gray"
-    return t("prob.none"), "#B0B0B0", "dark"
+        return t("prob.low"), color, "gray"
+    return t("prob.none"), color, "dark"
