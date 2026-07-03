@@ -27,6 +27,25 @@ PLACEHOLDER_COLORS = {
     "default": QColor(90, 90, 90),
 }
 
+# 技能名与素材文件名对不上的显式别名（键/值均为归一化名）。
+# 别名优先于同名直查：perk_crossbow_mastery.png 的图案并非弩，
+# 正确素材是 Reforged 的 crossbow_and_firearms_mastery。
+PERK_ICON_ALIASES = {
+    "crossbow_mastery": "crossbow_and_firearms_mastery",
+    # 剑圣组素材带 swordmaster_ 前缀，节点名不带
+    "blade_dancer": "swordmaster_blade_dancer",
+    "juggernaut": "swordmaster_juggernaut",
+    "metzger": "swordmaster_metzger",
+    "precise": "swordmaster_precise",
+    "reaper": "swordmaster_reaper",
+    "versatile_swordsman": "swordmaster_versatile_swordsman",
+    "kick": "swordmaster_grappler",  # 剑圣第7层（Kick/Push Through/Tackle）
+    # Reforged 素材沿用 mod 内部命名
+    "mentor_presence": "mentor",
+    "return_favor": "retribution",
+    "sundering_strikes": "dent_armor",
+}
+
 
 class IconProvider:
 
@@ -102,7 +121,12 @@ class IconProvider:
         pix = None
         norm = self._normalize_perk_name(perk_en_name)
         compact = self._normalize_compact(norm)
-        for candidate in (norm, compact):
+        alias = PERK_ICON_ALIASES.get(norm) or PERK_ICON_ALIASES.get(compact)
+        candidates = []
+        if alias:
+            candidates.extend((alias, self._normalize_compact(alias)))
+        candidates.extend((norm, compact))
+        for candidate in candidates:
             if candidate in self._perk_icon_map:
                 pix = QPixmap(self._perk_icon_map[candidate])
                 if not pix.isNull():

@@ -258,7 +258,7 @@ class GameData:
 
 
 def load_data(data_path: str,
-              expected_version: str = "0.7.6",
+              expected_version: str = "0.9.1",
               strict: bool = False,
               strict_version: bool = True,
               lang: str = "zh",

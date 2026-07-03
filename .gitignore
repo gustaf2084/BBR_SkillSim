@@ -34,3 +34,9 @@ src/builds/
 # Temporary
 *.tmp
 *.log
+
+# AI assistant (local only, not part of the app)
+CLAUDE.md
+
+# Data migration tooling (one-time scripts, not runtime code)
+tools/

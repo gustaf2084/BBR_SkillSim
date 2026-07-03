@@ -674,6 +674,14 @@ class SkillEngine:
         cat: str | None = gdef.get("category")
         if cat == "Always":
             return 1.0
+        # ── Guaranteed exclusive group: use direct guarantee probability ──
+        # See appear_prob_analytic() for the rationale — the mod resolves
+        # exclusive groups via a separate guaranteed mechanism independent
+        # of the "Exclusive category 0.5× roll" system.
+        if cat == "Exclusive":
+            guaranteed: dict[str, float] = self._get_guaranteed_exclusive_probs(bg_id)
+            if group in guaranteed:
+                return guaranteed[group]
         n: float = self.num_rolls(bg_id, cat)
         if n <= 0:
             return 0.0

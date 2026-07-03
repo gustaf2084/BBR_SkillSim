@@ -40,7 +40,7 @@ def temp_json():
 class TestLoadData:
     def test_load_data_valid(self, gd):
         assert isinstance(gd, GameData)
-        assert gd.version == "0.7.6"
+        assert gd.version == "0.9.1"
 
     def test_load_data_with_warnings(self):
         gd = load_data(DATA_PATH, expected_version="9.9.9",
@@ -65,7 +65,7 @@ class TestLoadData:
             os.remove(path)
 
     def test_load_data_missing_keys(self, temp_json):
-        path = temp_json({"meta": {"version": "0.7.6"}, "config": {}}, name="missing_keys.json")
+        path = temp_json({"meta": {"version": "0.9.1"}, "config": {}}, name="missing_keys.json")
         with pytest.raises(DataError) as excinfo:
             load_data(path, strict_version=False)
         assert excinfo.value.code == "schema"
@@ -84,7 +84,7 @@ class TestLoadData:
 
     def test_load_data_strict_mode(self, temp_json):
         minimal = {
-            "meta": {"version": "0.7.6"},
+            "meta": {"version": "0.9.1"},
             "config": {},
             "backgrounds": {},
             "traits": {},
@@ -156,8 +156,8 @@ class TestNames:
             gd.set_lang("zh")
 
     def test_trait_name_zh(self, gd):
-        assert gd.trait_name("Athletic") == "健壮"
-        assert gd.trait_name("Brute") == "粗野"
+        assert gd.trait_name("Athletic") == "行动敏捷"
+        assert gd.trait_name("Brute") == "野蛮"
 
     def test_trait_name_en(self, gd):
         gd.set_lang("en")
@@ -225,12 +225,12 @@ class TestVersionValidation:
         err = excinfo.value
         assert err.code == "version"
         assert err.detail is not None
-        assert err.detail.get("actual") == "0.7.6"
+        assert err.detail.get("actual") == "0.9.1"
         assert err.detail.get("expected") == "9.9.9"
 
     def test_version_match_ok(self):
-        gd = load_data(DATA_PATH, expected_version="0.7.6", strict_version=True)
-        assert gd.version == "0.7.6"
+        gd = load_data(DATA_PATH, expected_version="0.9.1", strict_version=True)
+        assert gd.version == "0.9.1"
 
     def test_strict_version_false_warning(self):
         gd = load_data(DATA_PATH, expected_version="9.9.9", strict_version=False)

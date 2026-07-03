@@ -416,50 +416,63 @@ class TestFractionalExclusiveRolls:
 
     非保证但有正权重的专属组因此获得 0.5×权重占比 的出现概率
     （此前 int(round(0.5))=0 使其恒为 0%）。保证组概率不受影响。
+
+    v0.4.2 / 0.9.1：swordmaster/fisherman/old_gladiator 在 0.9.1 中改
+    为 mixed 模式（两组均 guaranteed 100%），不再是非保证专属组的
+    测试对象。非保证专属组测试改用 prob 模式背景。
     """
 
-    # (bg, 非保证目标组, 期望概率)  期望值 = 0.5 × 目标权重 / 池内总权重
-    CASES = [
-        ("swordmaster_background", "Swordmaster", 0.25),      # 池 {Soldier:1, Swordmaster:1}
-        ("rf_old_swordmaster_background", "Swordmaster", 0.25),
-        ("fisherman_background", "Trapper", 0.25),
-        ("old_gladiator_background", "Trapper", 0.25),
-    ]
+    def test_swordmaster_both_guaranteed(self, engine):
+        """0.9.1: swordmaster 改为 mixed forced=[Soldier,Swordmaster]，两者均 100%。"""
+        for target in ("Soldier", "Swordmaster"):
+            p = engine.appear_prob_analytic("swordmaster_background", [], target)
+            assert p == pytest.approx(1.0), (
+                f"swordmaster {target}: expected 1.0, got {p:.4f}")
 
-    @pytest.mark.parametrize("bg,target,expected", CASES)
-    def test_nonguaranteed_exclusive_now_positive(self, engine, bg, target, expected):
-        p = engine.appear_prob_analytic(bg, [], target)
-        assert p == pytest.approx(expected, abs=0.01), (
-            f"{bg} {target}: expected ≈{expected}, got {p:.4f}")
+    def test_mixed_forced_pairs(self, engine):
+        """0.9.1: mixed 模式下 forced 组全部保证，非 forced 按 prob 分支。"""
+        assert engine.appear_prob_analytic(
+            "fisherman_background", [], "Trapper") == pytest.approx(1.0)
+        assert engine.appear_prob_analytic(
+            "fisherman_background", [], "Laborer") == pytest.approx(1.0)
+        assert engine.appear_prob_analytic(
+            "old_gladiator_background", [], "Trapper") == pytest.approx(1.0)
+        assert engine.appear_prob_analytic(
+            "old_gladiator_background", [], "Soldier") == pytest.approx(1.0)
 
     def test_barbarian_wildling_positive(self, engine):
-        """barbarian 的 Wildling(非保证,权重 0.203)不再是 0。"""
+        """barbarian 的 Wildling 在 0.9.1 加入 prob picks 权重 20%。"""
         p = engine.appear_prob_analytic("barbarian_background", [], "Wildling")
-        assert 0.05 < p < 0.20, f"Expected ~0.10, got {p:.4f}"
+        assert p == pytest.approx(0.2, abs=0.01), (
+            f"Expected Wildling ≈0.20, got {p:.4f}")
 
     def test_guaranteed_probs_unchanged(self, engine):
-        """保证组概率仍由保证机制给出,不受分数骰组影响。"""
+        """保证组概率仍由保证机制给出,不受分数骰组影响。
+        0.9.1: barbarian prob 池调整(Laborer:20,Raider:50,Trapper:10,Wildling:20)。"""
         assert engine.appear_prob_analytic(
             "swordmaster_background", [], "Soldier") == pytest.approx(1.0)
         assert engine.appear_prob_analytic(
-            "barbarian_background", [], "Raider") == pytest.approx(0.625)
+            "barbarian_background", [], "Raider") == pytest.approx(0.5)
         assert engine.appear_prob_analytic(
-            "barbarian_background", [], "Laborer") == pytest.approx(0.25)
+            "barbarian_background", [], "Laborer") == pytest.approx(0.2)
+        assert engine.appear_prob_analytic(
+            "barbarian_background", [], "Wildling") == pytest.approx(0.2)
 
     def test_analytic_matches_monte_carlo(self, engine):
-        """分数骰组路径的解析与蒙特卡洛一致（±0.02）。"""
-        for bg, target in [("swordmaster_background", "Swordmaster"),
-                           ("barbarian_background", "Wildling")]:
+        """prob 模式组的解析与蒙特卡洛一致（±0.02）。"""
+        for bg, target in [("barbarian_background", "Wildling"),
+                           ("anatomist_background", "Knave"),
+                           ("anatomist_background", "Trapper")]:
             pa = engine.appear_prob_analytic(bg, [], target)
             pm = engine.appear_prob_monte_carlo(bg, [], target, samples=8000, seed=7)
             assert pm == pytest.approx(pa, abs=0.02), (
                 f"{bg} {target}: analytic={pa:.4f} mc={pm:.4f}")
 
-    def test_forward_simulate_includes_fractional(self, engine):
-        """forward_simulate 结果里非保证专属组概率为正。"""
+    def test_forward_simulate_guaranteed_pairs(self, engine):
+        """0.9.1: forward_simulate 中 forced 组均为 100%。"""
         res = engine.forward_simulate("swordmaster_background", [], mode="analytic")
         assert res is not None
-        assert res.get("Swordmaster", 0) == pytest.approx(0.25, abs=0.01)
+        assert res.get("Swordmaster", 0) == pytest.approx(1.0)
         assert res.get("Soldier", 0) == pytest.approx(1.0)
 
     def test_integer_rolls_unaffected(self, engine):
