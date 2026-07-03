@@ -542,6 +542,7 @@ class SkillTreeWidget(QWidget):
         self._scene = QGraphicsScene()
         self._scene.setBackgroundBrush(QColor(theme.c("matrix_bg")))
         self._view = SkillTreeView(self._scene)
+        self._scroll_anim = None
 
         # placeholder hint
         self._placeholder = QLabel(t("st.placeholder"))
@@ -743,10 +744,10 @@ class SkillTreeWidget(QWidget):
     def _rebuild_chips(self):
         """Rebuild chip tag bar."""
         # clear old chips
-        for i in reversed(range(self._chip_layout.count())):
-            w = self._chip_layout.itemAt(i).widget()
+        while self._chip_layout.count():
+            item = self._chip_layout.takeAt(0)
+            w = item.widget()
             if w:
-                self._chip_layout.removeWidget(w)
                 w.deleteLater()
 
         active = [t for t in self._all_trees if t["group_id"] in self._active_ids]
@@ -801,9 +802,9 @@ class SkillTreeWidget(QWidget):
     def _animate_scroll(self, target_x):
         """Smooth scroll to target x position."""
         sb = self._view.horizontalScrollBar()
-        anim = QPropertyAnimation(sb, b"value")
-        anim.setDuration(300)
-        anim.setStartValue(sb.value())
-        anim.setEndValue(target_x)
-        anim.setEasingCurve(QEasingCurve.OutCubic)
-        anim.start()
+        self._scroll_anim = QPropertyAnimation(sb, b"value")
+        self._scroll_anim.setDuration(300)
+        self._scroll_anim.setStartValue(sb.value())
+        self._scroll_anim.setEndValue(target_x)
+        self._scroll_anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._scroll_anim.start()

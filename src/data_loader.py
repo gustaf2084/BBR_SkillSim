@@ -122,7 +122,8 @@ class GameData:
             try:
                 with open(self._perk_trees_path, "r", encoding="utf-8") as f:
                     self._perk_trees = json.load(f, object_pairs_hook=OrderedDict)
-            except Exception:
+            except Exception as e:
+                self.warnings.append(f"perk_trees load failed: {e}")
                 self._perk_trees = {}
         else:
             self._perk_trees = self._data.get("perk_trees", {})

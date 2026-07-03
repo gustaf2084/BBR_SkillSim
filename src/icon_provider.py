@@ -143,7 +143,7 @@ class IconProvider:
                                 break
         if pix is None or pix.isNull():
             self._missing.add(("perk", perk_en_name))
-        result = pix if (pix and not pix.isNull()) else QPixmap(size, size)
+        result = pix if (pix and not pix.isNull()) else QPixmap()
         self._cache[key] = result
         return result
 

@@ -54,6 +54,8 @@ _ATTR_ORDER = [
     "Melee Skill", "Ranged Skill", "Melee Defense", "Ranged Defense",
 ]
 
+_STAR_EXPECTED = "__expected__"
+
 
 class ProbBarDelegate(QStyledItemDelegate):
     """自绘概率条:扁平圆角实色填充,颜色随概率分层、随主题切换。
@@ -197,9 +199,10 @@ class ForwardTab(QWidget):
             star_layout.addWidget(lbl, i, 0)
             combo = QComboBox()
             combo.setObjectName("starCombo")
+            combo.addItem(t("star.expected"), _STAR_EXPECTED)
             for s in range(4):
                 combo.addItem(t(f"star.{s}"), s)
-            combo.setCurrentIndex(1)  # default 1 star
+            combo.setCurrentIndex(0)
             combo.currentIndexChanged.connect(self._on_star_changed)
             self._star_combos[attr] = combo
             star_layout.addWidget(combo, i, 1)
@@ -334,6 +337,9 @@ class ForwardTab(QWidget):
     # ---- data ready ----
 
     def on_data_ready(self, gd, engine, icon_provider):
+        prev_bg_id = self.bg_combo.currentData()
+        prev_traits = {cb.property("trait_id") for cb in self._trait_checkboxes if cb.isChecked()}
+
         self.gd = gd
         self.engine = engine
         self.icon_provider = icon_provider
@@ -349,10 +355,11 @@ class ForwardTab(QWidget):
             bg_names.append(zh)
         self._bg_model.setStringList(bg_names)
         if filtered:
-            self.bg_combo.setCurrentIndex(0)
+            idx = self.bg_combo.findData(prev_bg_id)
+            self.bg_combo.setCurrentIndex(idx if idx >= 0 else 0)
 
         # traits
-        self._build_trait_grid()
+        self._build_trait_grid(prev_traits)
 
         # sync skill tree language, refresh tooltip if results exist
         self.skill_tree.set_lang(getattr(gd, "lang", "zh"))
@@ -403,8 +410,9 @@ class ForwardTab(QWidget):
         for attr, (name_lbl, val_lbl) in self._attr_bars.items():
             name_lbl.setText(t(_ATTR_I18N[attr]))
         for attr, combo in self._star_combos.items():
+            combo.setItemText(0, t("star.expected"))
             for s in range(4):
-                combo.setItemText(s, t(f"star.{s}"))
+                combo.setItemText(s + 1, t(f"star.{s}"))
         for attr, lbl in self._star_labels.items():
             lbl.setText(t(_ATTR_I18N[attr]))
         # refresh attribute panel with current bg
@@ -430,7 +438,8 @@ class ForwardTab(QWidget):
                 t("forward.result_ok_prefix") + self.gd.bg_name(bg_id) +
                 (" + " + traits_str if traits_str else ""))
 
-    def _build_trait_grid(self):
+    def _build_trait_grid(self, selected_traits=None):
+        selected_traits = selected_traits or set()
         # clear old
         for cb in self._trait_checkboxes:
             self.trait_grid.removeWidget(cb)
@@ -445,9 +454,11 @@ class ForwardTab(QWidget):
             cb.setProperty("trait_id", tid)
             cb.setToolTip(tid)
             cb.toggled.connect(self._on_trait_toggle)
+            cb.setChecked(tid in selected_traits)
             self._trait_checkboxes.append(cb)
             r, c = divmod(i, self.TRAIT_COLS)
             self.trait_grid.addWidget(cb, r, c)
+        self._on_trait_toggle(False)
         self._update_trait_counter()
 
     def _selected_traits(self):
@@ -527,22 +538,31 @@ class ForwardTab(QWidget):
         if self._last_results is not None:
             self._on_calculate()
 
-    def _gather_talent_stars(self) -> dict[str, float]:
+    def _gather_talent_stars(self, bg_id: str | None = None) -> dict[str, float] | None:
         """Collect current star values from UI combos."""
-        return {attr: float(combo.currentData())
-                for attr, combo in self._star_combos.items()}
+        expected = {}
+        if self.engine is not None and bg_id:
+            expected = self.engine._bg_expected_talent_stars(bg_id)
+
+        stars = {}
+        all_expected = True
+        for attr, combo in self._star_combos.items():
+            data = combo.currentData()
+            if data == _STAR_EXPECTED:
+                stars[attr] = float(expected.get(attr, 1.0))
+            else:
+                stars[attr] = float(data)
+                all_expected = False
+        return None if all_expected else stars
 
     def _sync_stars_from_engine(self, bg_id: str):
         """Set star combos to engine-derived defaults for the given background."""
         if self.engine is None:
             return
-        expected = self.engine._bg_expected_talent_stars(bg_id)
         self._gathering_stars = True
         try:
             for attr, combo in self._star_combos.items():
-                stars = expected.get(attr, 1.0)
-                idx = max(0, min(3, int(round(stars))))
-                combo.setCurrentIndex(idx)
+                combo.setCurrentIndex(0)
         finally:
             self._gathering_stars = False
 
@@ -560,7 +580,7 @@ class ForwardTab(QWidget):
         mode = self.mode_combo.currentData()
 
         # v0.3.0: Gather talent stars from UI
-        talent_stars = self._gather_talent_stars()
+        talent_stars = self._gather_talent_stars(bg_id)
 
         # v0.3.0: Refresh attribute panel
         self._refresh_attr_panel(bg_id)

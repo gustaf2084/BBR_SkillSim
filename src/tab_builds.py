@@ -294,18 +294,22 @@ class BuildsTab(QWidget):
     # ── data ready ──────────────────────────────────────────────
 
     def on_data_ready(self, gd, engine, icon_provider):
+        prev_bg_id = self._current_bg_id
         self.gd = gd
         self.engine = engine
         self.icon_provider = icon_provider
         self.skill_tree._icon_provider = icon_provider
 
         self.bg_list.clear()
+        restore_row = -1
         for bg_id in gd.filtered_complete_backgrounds():
             item = QListWidgetItem(gd.bg_name(bg_id))
             item.setData(Qt.UserRole, bg_id)
             self.bg_list.addItem(item)
+            if bg_id == prev_bg_id:
+                restore_row = self.bg_list.count() - 1
         if self.bg_list.count() > 0:
-            self.bg_list.setCurrentRow(0)
+            self.bg_list.setCurrentRow(restore_row if restore_row >= 0 else 0)
 
         # sync skill tree language, refresh tooltip if results exist
         self.skill_tree.set_lang(getattr(gd, "lang", "zh"))
@@ -433,9 +437,11 @@ class BuildsTab(QWidget):
 
     def _rebuild_tag_bar(self):
         # clear old
-        for btn in self._build_tag_btns:
-            self.tag_layout_inner.removeWidget(btn)
-            btn.deleteLater()
+        while self.tag_layout_inner.count():
+            item = self.tag_layout_inner.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
         self._build_tag_btns.clear()
 
         for i, bd in enumerate(self._builds_data):

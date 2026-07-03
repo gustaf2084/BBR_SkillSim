@@ -117,6 +117,7 @@ _add("attr.missing",      "属性数据待补", "Attribute data unavailable")
 
 # ── v0.3.0: Forward tab talent star adjustment ──
 _add("forward.talent_stars",   "天赋星级调节", "Talent Stars")
+_add("star.expected", "期望值", "Expected")
 _add("star.0", "0星", "0★")
 _add("star.1", "1星", "1★")
 _add("star.2", "2星", "2★")

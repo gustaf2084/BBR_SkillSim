@@ -109,8 +109,8 @@ def parse_build_file(filepath):
                     bd.parse_errors.append(
                         t("parser.bad_order").format(lineno, key))
                     continue
-                parts = [p.strip() for p in value.split(",")]
-                if len(parts) < 3:
+                parts = [p.strip() for p in value.split(",", 2)]
+                if len(parts) < 3 or not all(parts[:3]):
                     bd.parse_errors.append(
                         t("parser.bad_format").format(lineno))
                     continue

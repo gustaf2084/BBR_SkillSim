@@ -43,6 +43,7 @@ class ReverseDeriveWorker(QThread):
     """Worker thread for reverse_derive to prevent UI freezing."""
     progress = Signal(int, int)    # current, total
     finished = Signal(object)      # result dict
+    cancelled = Signal()           # user cancellation
     error = Signal(str)            # error message
 
     def __init__(self, engine, targets, mode, multi_trait, top_n,
@@ -78,7 +79,9 @@ class ReverseDeriveWorker(QThread):
                 use_attribute=self.use_attribute,
                 use_projected=self.use_projected,
             )
-            if not result.get("cancelled"):
+            if result.get("cancelled"):
+                self.cancelled.emit()
+            else:
                 self.finished.emit(result)
         except Exception as e:
             self.error.emit(str(e))
@@ -252,10 +255,11 @@ class ReverseTab(QWidget):
     # ── data ready ──────────────────────────────────────────────
 
     def on_data_ready(self, gd, engine, icon_provider):
+        prev_targets = set(self._checked_targets())
         self.gd = gd
         self.engine = engine
         self.icon_provider = icon_provider
-        self._build_category_panels()
+        self._build_category_panels(prev_targets)
         self.retranslate()
 
     def retranslate(self):
@@ -327,8 +331,9 @@ class ReverseTab(QWidget):
                     targets.append(gid)
         return targets
 
-    def _build_category_panels(self):
+    def _build_category_panels(self, selected_targets=None):
         """Build category collapsible panels with QCheckBox grids inside."""
+        selected_targets = selected_targets or set()
         # clear old
         for cat, panel in self._cat_panels.items():
             self._cat_layout.removeWidget(panel)
@@ -357,6 +362,7 @@ class ReverseTab(QWidget):
                 cb = QCheckBox(self.gd.group_name(g))
                 cb.setToolTip(g)
                 cb.setProperty("group_id", g)
+                cb.setChecked(g in selected_targets)
                 cbs.append((cb, g))
                 row, col = divmod(i, 2)
                 grid.addWidget(cb, row, col)
@@ -395,6 +401,7 @@ class ReverseTab(QWidget):
             self.engine, targets, mode, multi_trait, top_n)
         self._worker.progress.connect(self._on_worker_progress)
         self._worker.finished.connect(self._on_worker_finished)
+        self._worker.cancelled.connect(self._on_worker_cancelled)
         self._worker.error.connect(self._on_worker_error)
         self._worker.start()
 
@@ -408,6 +415,9 @@ class ReverseTab(QWidget):
     def _on_worker_finished(self, result):
         self._finish_derive(result)
 
+    def _on_worker_cancelled(self):
+        self._finish_derive(None)
+
     def _on_worker_error(self, err_msg):
         QMessageBox.critical(self, t("reverse.err_title"),
                              t("reverse.err_prefix") + err_msg)
@@ -415,12 +425,14 @@ class ReverseTab(QWidget):
 
     def _on_cancel(self):
         if self._worker and self._worker.isRunning():
+            self.cancel_btn.setEnabled(False)
             self._worker.requestInterruption()
 
     def _finish_derive(self, rd):
         """Common cleanup after derive (threaded or direct)."""
         self._worker = None
         self.derive_btn.setEnabled(True)
+        self.cancel_btn.setEnabled(True)
         self.progress_bar.setVisible(False)
         self.progress_label.setVisible(False)
         self.cancel_btn.setVisible(False)

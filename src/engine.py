@@ -325,7 +325,8 @@ class SkillEngine:
 
         # 投影属性
         if use_projected:
-            proj = projected if projected is not None else self._bg_projected_attrs(bg_id)
+            proj = projected if projected is not None else self._bg_projected_attrs(
+                bg_id, talent_stars=talent_stars)
             w += self.projected_attr_weight(group, projected=proj)
 
         # 专属组级联
@@ -505,9 +506,9 @@ class SkillEngine:
 
         full_mask: int = (1 << len(names)) - 1
         top_result: float = p_hit(full_mask, n_eff)
-        # 容量上限：超限整体清空（单条重算成本低，无需精细 LRU）
+        # 容量上限：超限时淘汰最早插入的一条，避免整体清空造成缓存抖动
         if len(self._norepl_cache) >= self._norepl_cache_max:
-            self._norepl_cache.clear()
+            self._norepl_cache.pop(next(iter(self._norepl_cache)), None)
         self._norepl_cache[cache_key] = top_result
         return top_result
 
@@ -593,7 +594,7 @@ class SkillEngine:
             if w > 0:
                 weights[g] = w
         if len(self._pool_cache) >= self._pool_cache_max:
-            self._pool_cache.clear()
+            self._pool_cache.pop(next(iter(self._pool_cache)), None)
         self._pool_cache[key] = weights
         return weights
 

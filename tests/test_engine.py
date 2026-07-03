@@ -410,6 +410,17 @@ class TestV030BgAttributes:
         w_low = engine.attribute_star_weight("Trained", talent_stars=low_stars)
         assert w_high > w_low, f"Stars=3 weight ({w_high}) should be > stars=0 ({w_low})"
 
+    def test_projected_attrs_use_talent_stars_override(self, engine):
+        """Manual talent_stars should affect projected-attribute weighting too."""
+        gd = engine.gd
+        high_stars = {a: 3.0 for a in gd.attribute_weights}
+        low_stars = {a: 0.0 for a in gd.attribute_weights}
+        projected_high = engine._bg_projected_attrs("farmhand_background", high_stars)
+        projected_low = engine._bg_projected_attrs("farmhand_background", low_stars)
+        w_high = engine.projected_attr_weight("Fencer", projected_high)
+        w_low = engine.projected_attr_weight("Fencer", projected_low)
+        assert w_high > w_low, f"Projected weight should increase with stars: {w_high} <= {w_low}"
+
 
 class TestFractionalExclusiveRolls:
     """v0.3.0: Exclusive 基线 0.5 = 50% 概率额外骰一次专属组。
