@@ -9,14 +9,20 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QLabel, QSizePolicy, QToolButton, QVBoxLayout, QWidget
 
 
-def make_placeholder(text, sub_text=""):
+def make_placeholder(text, sub_text="", icon_provider=None):
     """创建就绪/等待状态提示组件。"""
+    import theme
     w = QWidget()
     v = QVBoxLayout(w)
     v.setAlignment(Qt.AlignCenter)
     v.setContentsMargins(20, 40, 20, 40)
 
-    icon = QLabel("◈")
+    if icon_provider is not None:
+        pix = icon_provider.get_placeholder_pixmap(theme.c("border_strong"), 36)
+        icon = QLabel()
+        icon.setPixmap(pix)
+    else:
+        icon = QLabel("◈")
     icon.setObjectName("placeholder_icon")
     icon.setAlignment(Qt.AlignCenter)
     v.addWidget(icon)

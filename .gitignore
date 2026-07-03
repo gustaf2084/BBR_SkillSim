@@ -15,6 +15,7 @@ src/build/
 .vscode/
 .idea/
 .claude/
+.codex/
 
 # Virtualenv
 .venv/

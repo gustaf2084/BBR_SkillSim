@@ -29,7 +29,7 @@ class AboutTab(QWidget):
     def _build_ui(self):
         v = QVBoxLayout(self)
         v.setSpacing(12)
-        v.setContentsMargins(24, 20, 24, 20)
+        v.setContentsMargins(24, 24, 24, 24)
 
         # title
         self._page_title = QLabel(t("about.title"))

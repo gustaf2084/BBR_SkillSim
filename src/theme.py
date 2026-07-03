@@ -16,26 +16,30 @@ Usage:
 
 LIGHT = {
     # 基础表面
-    "window_bg":      "#F5F0E8",
+    "window_bg":      "#F4EFE6",
     "surface":        "#FFFFFF",
-    "sunken":         "#F0EDE6",
-    "hover":          "#EBE4D6",
-    "pressed":        "#DDD4C2",
-    "row_alt":        "#FAF7F0",
+    "sunken":         "#EFECE4",
+    "hover":          "#E9E2D2",
+    "pressed":        "#DBD2BE",
+    "row_alt":        "#F9F6EE",
+    "surface_raised": "#FDFCF8",
     # 边框
     "border":         "#DDD6CC",
-    "border_strong":  "#C8BFA8",
+    "border_strong":  "#C4B898",
+    "divider":        "#DDD6CC",
     # 文字
     "text":           "#1C1814",
     "text_muted":     "#6B6359",
-    "text_faint":     "#A09888",
+    "text_faint":     "#9E9688",
     # 强调色(金)
     "accent":         "#B8860B",
     "accent_hover":   "#C7950C",
     "accent_pressed": "#9A6F09",
     "accent_soft":    "#F0E8D4",
     "accent_deep":    "#8B6914",
+    "accent_glow":    "#F4ECD8",
     "on_accent":      "#FFFFFF",
+    "focus_ring":     "#B8860B",
     # 输入控件
     "input_bg":       "#FFFFFF",
     "input_bg_alt":   "#FFFEF9",
@@ -48,6 +52,7 @@ LIGHT = {
     "nav_text_hover": "#E0D8C0",
     "nav_text_faint": "#9B9285",
     "nav_divider":    "#3A3024",
+    "nav_accent_line": "#B8860B",
     # 羊皮纸提示 / 错误提示
     "parchment_bg":     "#FDF8F0",
     "parchment_border": "#C8BFA8",
@@ -69,7 +74,7 @@ LIGHT = {
     "matrix_header_bg":     "#F2F0E8",
     "matrix_corner":        "#E8E4D8",
     "matrix_grid":          "#E0DCD0",
-    "matrix_header_border": "#D0CCC0",
+    "matrix_header_border": "#C4B898",
     "matrix_row_text":      "#6B6359",
     "matrix_header_text":   "#333333",
     # 纯度列底色
@@ -84,36 +89,40 @@ LIGHT = {
 }
 
 DARK = {
-    "window_bg":      "#1E1912",
-    "surface":        "#262019",
-    "sunken":         "#1A1510",
-    "hover":          "#332B1F",
-    "pressed":        "#3D3323",
-    "row_alt":        "#221C14",
-    "border":         "#3A3226",
-    "border_strong":  "#55492F",
-    "text":           "#E4DCC8",
+    "window_bg":      "#1A1712",
+    "surface":        "#221E17",
+    "sunken":         "#151210",
+    "hover":          "#2D261C",
+    "pressed":        "#383022",
+    "row_alt":        "#1E1A14",
+    "surface_raised": "#28231A",
+    "border":         "#3D3528",
+    "border_strong":  "#554B32",
+    "text":           "#EAE2CC",
     "text_muted":     "#A89F8C",
     "text_faint":     "#6E6656",
-    "accent":         "#C99620",
-    "accent_hover":   "#D9A82E",
-    "accent_pressed": "#A87D14",
-    "accent_soft":    "#3D3420",
-    "accent_deep":    "#D9A82E",
+    "accent":         "#D4A832",
+    "accent_hover":   "#E0B844",
+    "accent_pressed": "#B8921E",
+    "accent_soft":    "#3D3422",
+    "accent_deep":    "#E0B844",
+    "accent_glow":    "#4A3D20",
     "on_accent":      "#1C1408",
-    "input_bg":       "#211B13",
-    "input_bg_alt":   "#241E15",
-    "nav_bg":         "#14100A",
+    "focus_ring":     "#D4A832",
+    "input_bg":       "#1E1912",
+    "input_bg_alt":   "#211B14",
+    "nav_bg":         "#12100C",
     "nav_border":     "#0A0806",
-    "nav_hover":      "#262019",
-    "nav_selected":   "#33291A",
+    "nav_hover":      "#221E17",
+    "nav_selected":   "#2E2618",
     "nav_text":       "#C8BFA8",
     "nav_text_hover": "#E8DFC8",
     "nav_text_faint": "#857C68",
     "nav_divider":    "#2C2416",
+    "nav_accent_line": "#D4A832",
     "parchment_bg":     "#2B2418",
-    "parchment_border": "#55492F",
-    "parchment_title":  "#D9A82E",
+    "parchment_border": "#554B32",
+    "parchment_title":  "#E0B844",
     "error_bg":       "#2E1B18",
     "error_border":   "#B0453A",
     "error_title":    "#E07B6E",
@@ -123,27 +132,28 @@ DARK = {
     "danger_soft_bg": "#3A2320",
     "tooltip_bg":     "#2C2416",
     "tooltip_text":   "#E0D8C0",
-    "table_grid":     "#332B1F",
-    "matrix_bg":            "#201A12",
-    "matrix_header_bg":     "#262019",
-    "matrix_corner":        "#2C2517",
-    "matrix_grid":          "#332B1F",
-    "matrix_header_border": "#3A3226",
+    "table_grid":     "#3D3528",
+    "divider":        "#3D3528",
+    "matrix_bg":            "#1C1610",
+    "matrix_header_bg":     "#221E17",
+    "matrix_corner":        "#28231A",
+    "matrix_grid":          "#3D3528",
+    "matrix_header_border": "#554B32",
     "matrix_row_text":      "#A89F8C",
     "matrix_header_text":   "#D8D0BC",
     "purity_good_bg": "#263223",
     "purity_bad_bg":  "#3A2320",
-    "scroll_handle":       "#55492F",
+    "scroll_handle":       "#554B32",
     "scroll_handle_hover": "#6B5C3D",
     "bar_track":      "#2C2517",
-    "bar_border":     "#3A3226",
+    "bar_border":     "#3D3528",
 }
 
 # ── 概率分层色(高→无,5 档)──────────────────────────────────
 # 阈值:>=0.80 / >=0.50 / >=0.20 / >0 / =0
 
-_PROB_LIGHT = ["#27704B", "#A0522D", "#5A6B7D", "#8B8378", "#B0B0B0"]
-_PROB_DARK = ["#4CAF7D", "#C97B4A", "#8FA3B8", "#A39B8B", "#6B6B6B"]
+_PROB_LIGHT = ["#2E7D4F", "#A0522D", "#4A6A84", "#8B8378", "#B0B0B0"]
+_PROB_DARK = ["#4CAF7D", "#D0895A", "#8FA3B8", "#A39B8B", "#6B6B6B"]
 
 # ── 类别徽章底色(白字,两套主题共用)────────────────────────
 CAT_COLOR = {
@@ -233,6 +243,7 @@ QWidget {{
     font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
     font-size: 13px;
     color: {c("text")};
+    outline: none;
 }}
 
 QMainWindow, QStackedWidget, QDialog {{
@@ -243,6 +254,7 @@ QMainWindow, QStackedWidget, QDialog {{
 #nav_panel {{
     background-color: {c("nav_bg")};
     border-right: 1px solid {c("nav_border")};
+    border-top: 2px solid {c("nav_accent_line")};
 }}
 
 #nav_title {{
@@ -250,6 +262,8 @@ QMainWindow, QStackedWidget, QDialog {{
     color: {c("nav_text_hover")};
     border-left: 3px solid {c("accent")};
     padding-left: 11px;
+    padding-top: 2px;
+    padding-bottom: 2px;
 }}
 
 #nav_list {{
@@ -262,7 +276,7 @@ QMainWindow, QStackedWidget, QDialog {{
 }}
 
 #nav_list::item {{
-    padding: 10px 14px;
+    padding: 12px 14px;
     border-left: 3px solid transparent;
     border-bottom: none;
     color: {c("nav_text")};
@@ -293,10 +307,10 @@ QMainWindow, QStackedWidget, QDialog {{
     background: transparent;
     border: 1px solid {c("nav_divider")};
     border-radius: 4px;
-    padding: 2px 8px;
+    padding: 4px 10px;
     margin: 2px 14px;
     min-width: 72px;
-    min-height: 18px;
+    min-height: 22px;
 }}
 
 #nav_foot_btn:hover {{
@@ -329,6 +343,11 @@ QPushButton:disabled {{
     border-color: {c("border")};
 }}
 
+QPushButton:focus {{
+    border-color: {c("focus_ring")};
+    outline: none;
+}}
+
 QPushButton#primary_btn {{
     background-color: {c("accent")};
     color: {c("on_accent")};
@@ -336,6 +355,7 @@ QPushButton#primary_btn {{
     font-size: 14px;
     font-weight: bold;
     padding: 10px 20px;
+    border-radius: 6px;
 }}
 
 QPushButton#primary_btn:hover {{ background-color: {c("accent_hover")}; }}
@@ -435,8 +455,8 @@ QToolButton#collapse_header {{
     background: {c("sunken")};
     color: {c("text")};
     border: 1px solid {c("border")};
-    border-radius: 4px;
-    padding: 6px 8px;
+    border-radius: 6px;
+    padding: 6px 10px;
     font-size: 13px;
     font-weight: 600;
     text-align: left;
@@ -456,8 +476,8 @@ QToolButton#collapse_header:checked {{
     background: {c("surface")};
     border: 1px solid {c("border")};
     border-top: none;
-    border-bottom-left-radius: 4px;
-    border-bottom-right-radius: 4px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
 }}
 
 /* ── 输入控件 ── */
@@ -470,7 +490,7 @@ QComboBox {{
     color: {c("text")};
 }}
 
-QComboBox:hover, QComboBox:focus {{ border-color: {c("accent")}; }}
+QComboBox:focus, QComboBox:hover {{ border-color: {c("focus_ring")}; }}
 
 QComboBox::drop-down {{
     subcontrol-origin: padding;
@@ -495,7 +515,7 @@ QLineEdit {{
     color: {c("text")};
 }}
 
-QLineEdit:focus {{ border-color: {c("accent")}; }}
+QLineEdit:focus {{ border-color: {c("focus_ring")}; }}
 
 QLineEdit#search_input {{
     padding: 4px 8px;
@@ -513,7 +533,7 @@ QSpinBox, QDoubleSpinBox {{
     color: {c("text")};
 }}
 
-QSpinBox:focus, QDoubleSpinBox:focus {{ border-color: {c("accent")}; }}
+QSpinBox:focus, QDoubleSpinBox:focus {{ border-color: {c("focus_ring")}; }}
 
 /* ── 复选框 ── */
 QCheckBox {{
@@ -531,7 +551,7 @@ QCheckBox::indicator {{
     background-color: {c("input_bg")};
 }}
 
-QCheckBox::indicator:hover {{ border-color: {c("accent")}; }}
+QCheckBox::indicator:hover {{ border-color: {c("focus_ring")}; }}
 
 QCheckBox::indicator:checked {{
     background-color: {c("accent")};
@@ -569,9 +589,9 @@ QGroupBox {{
     font-weight: 600;
     color: {c("text")};
     border: 1px solid {c("border")};
-    border-radius: 6px;
-    margin-top: 14px;
-    padding: 16px 12px 12px 12px;
+    border-radius: 8px;
+    margin-top: 16px;
+    padding: 18px 12px 12px 12px;
     background-color: {c("surface")};
 }}
 
@@ -580,6 +600,7 @@ QGroupBox::title {{
     subcontrol-position: top left;
     padding: 4px 10px;
     margin-left: 12px;
+    border-bottom: 2px solid {c("accent")};
 }}
 
 /* ── 表格 ── */
@@ -608,7 +629,7 @@ QHeaderView::section {{
     font-size: 12px;
     padding: 8px 10px;
     border: none;
-    border-bottom: 2px solid {c("border_strong")};
+    border-bottom: 3px solid {c("accent")};
     border-right: 1px solid {c("border")};
 }}
 
@@ -776,7 +797,7 @@ QMenu::item:selected {{
 #card {{
     background-color: {c("surface")};
     border: 1px solid {c("border")};
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 14px;
 }}
 
@@ -885,7 +906,7 @@ QMenu::item:selected {{
 #attrValues {{
     font-size: 11px;
     color: {c("text_muted")};
-    font-family: "Consolas", monospace;
+    font-family: "Cascadia Code", "Consolas", monospace;
     min-width: 60px;
 }}
 

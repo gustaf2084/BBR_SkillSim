@@ -5,7 +5,7 @@ import os
 import sys
 import traceback
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -29,7 +29,7 @@ from i18n import set_lang as i18n_set_lang
 from i18n import t
 from icon_provider import IconProvider
 
-NAV_ICONS = ["▶", "◀", "☰", "ⓘ"]
+NAV_ICON_KEYS = ["forward", "reverse", "builds", "about"]
 NAV_KEYS = ["nav.forward", "nav.reverse", "nav.builds", "nav.about"]
 
 
@@ -205,21 +205,29 @@ class MainWindow(QMainWindow):
 
     def _update_nav_labels(self):
         for i in range(min(len(NAV_KEYS), self.nav.count())):
-            self.nav.item(i).setText(f"{NAV_ICONS[i]}  {t(NAV_KEYS[i])}")
+            self.nav.item(i).setText(f"     {t(NAV_KEYS[i])}")
         self.nav_title.setText(t("nav.title"))
 
     def _update_foot_buttons(self):
-        """刷新导航底部语言/主题按钮的文字与提示。"""
-        # 语言按钮显示目标语言
-        self.lang_btn.setText("English" if self.lang == "zh" else "中文")
+        """刷新导航底部语言/主题按钮的文字与提示,并设置图标。"""
+        ip = getattr(self, "icon_provider", None)
+        nav_color = theme.c("nav_text_faint")
+        # 语言按钮
+        self.lang_btn.setText(" English" if self.lang == "zh" else " 中文")
         self.lang_btn.setToolTip("切换到 English" if self.lang == "zh" else "Switch to 中文")
-        # 主题按钮显示目标主题
+        if ip is not None:
+            self.lang_btn.setIcon(ip.get_lang_icon(nav_color, 16))
+        # 主题按钮
         if theme.is_dark():
-            self.theme_btn.setText("☀ " + t("theme.to_light"))
+            self.theme_btn.setText(" ☀ " + t("theme.to_light"))
             self.theme_btn.setToolTip(t("theme.tip_light"))
+            if ip is not None:
+                self.theme_btn.setIcon(ip.get_theme_icon(True, nav_color, 16))
         else:
-            self.theme_btn.setText("🌙 " + t("theme.to_dark"))
+            self.theme_btn.setText(" 🌙 " + t("theme.to_dark"))
             self.theme_btn.setToolTip(t("theme.tip_dark"))
+            if ip is not None:
+                self.theme_btn.setIcon(ip.get_theme_icon(False, nav_color, 16))
 
     # ── UI construction ───────────────────────────────────────────
 
@@ -250,8 +258,10 @@ class MainWindow(QMainWindow):
 
         self.nav = QListWidget()
         self.nav.setObjectName("nav_list")
+        self.nav.setIconSize(QSize(22, 22))
+        self.nav.setSpacing(1)
         for i, key in enumerate(NAV_KEYS):
-            item = QListWidgetItem(f"{NAV_ICONS[i]}  {t(key)}")
+            item = QListWidgetItem(f"     {t(key)}")
             item.setData(Qt.UserRole, key)
             self.nav.addItem(item)
         self.nav.setCurrentRow(0)
@@ -263,12 +273,14 @@ class MainWindow(QMainWindow):
         self.theme_btn = QPushButton()
         self.theme_btn.setObjectName("nav_foot_btn")
         self.theme_btn.setCursor(Qt.PointingHandCursor)
+        self.theme_btn.setIconSize(QSize(16, 16))
         self.theme_btn.clicked.connect(self._toggle_theme)
         nl.addWidget(self.theme_btn)
 
         self.lang_btn = QPushButton()
         self.lang_btn.setObjectName("nav_foot_btn")
         self.lang_btn.setCursor(Qt.PointingHandCursor)
+        self.lang_btn.setIconSize(QSize(16, 16))
         self.lang_btn.clicked.connect(self._toggle_lang)
         nl.addWidget(self.lang_btn)
         self._update_foot_buttons()

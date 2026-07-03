@@ -126,7 +126,8 @@ class ForwardTab(QWidget):
         # ===== LEFT =====
         left = QWidget()
         lv = QVBoxLayout(left)
-        lv.setSpacing(8)
+        lv.setContentsMargins(0, 12, 0, 0)
+        lv.setSpacing(10)
 
         # bg group
         self._bg_grp = QGroupBox(t("forward.char_config"))
@@ -178,7 +179,7 @@ class ForwardTab(QWidget):
         # advanced (true collapsible section)
         self._adv_sec = CollapsibleSection(t("forward.advanced"), expanded=False)
         af = QFormLayout(self._adv_sec.content)
-        af.setContentsMargins(10, 8, 10, 8)
+        af.setContentsMargins(12, 8, 12, 8)
         self.attr_check = QCheckBox(t("forward.use_attr"))
         self.attr_check.setChecked(True)
         self.attr_check.toggled.connect(self._on_attr_toggled)  # v0.3.0
@@ -226,7 +227,7 @@ class ForwardTab(QWidget):
         # ===== RIGHT =====
         right = QWidget()
         rv = QVBoxLayout(right)
-        rv.setContentsMargins(0, 0, 0, 0)
+        rv.setContentsMargins(24, 8, 24, 0)
 
         self.result_title = QLabel(t("forward.result_title_ph"))
         self.result_title.setObjectName("page_title")
@@ -258,7 +259,7 @@ class ForwardTab(QWidget):
         self._attr_panel.setObjectName("attrPanel")
         attr_layout = QGridLayout(self._attr_panel)
         attr_layout.setSpacing(6)
-        attr_layout.setContentsMargins(10, 8, 10, 8)
+        attr_layout.setContentsMargins(12, 8, 12, 8)
         for i, attr in enumerate(_ATTR_ORDER):
             name_lbl = QLabel(t(_ATTR_I18N[attr]))
             name_lbl.setObjectName("attrLabel")

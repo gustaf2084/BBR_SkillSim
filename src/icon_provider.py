@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 icon_provider.py
-Icon loading with placeholder fallback - upgraded badge-style placeholders.
+Icon loading with SVG placeholder fallback for nav/UI icons,
+and PNG-based perk icon loading from icons/ directory.
 """
 
 import os
 import re
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QByteArray, QSize, Qt
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -19,6 +20,81 @@ from PySide6.QtGui import (
     QPen,
     QPixmap,
 )
+from PySide6.QtSvg import QSvgRenderer
+
+# ── Inline SVG icons (theme-aware, 32x32 viewBox) ──────────────────
+
+_NAV_FORWARD_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <path d="M6 16h18M20 8l8 8-8 8" stroke="{color}" stroke-width="2.5" fill="none"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>"""
+
+_NAV_REVERSE_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <path d="M26 16H8M12 24l-8-8 8-8" stroke="{color}" stroke-width="2.5" fill="none"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>"""
+
+_NAV_BUILDS_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect x="4" y="4" width="10" height="10" rx="2" stroke="{color}" stroke-width="2" fill="none"/>
+  <rect x="18" y="4" width="10" height="10" rx="2" stroke="{color}" stroke-width="2" fill="none"/>
+  <rect x="4" y="18" width="10" height="10" rx="2" stroke="{color}" stroke-width="2" fill="none"/>
+  <rect x="18" y="18" width="10" height="10" rx="2" stroke="{color}" stroke-width="2" fill="none"/>
+</svg>"""
+
+_NAV_ABOUT_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <circle cx="16" cy="16" r="12" stroke="{color}" stroke-width="2" fill="none"/>
+  <text x="16" y="21" text-anchor="middle" font-size="16" font-weight="bold"
+        fill="{color}" font-family="sans-serif">i</text>
+</svg>"""
+
+_THEME_LIGHT_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <circle cx="16" cy="16" r="6" stroke="{color}" stroke-width="2" fill="none"/>
+  <g stroke="{color}" stroke-width="2" stroke-linecap="round">
+    <line x1="16" y1="3" x2="16" y2="7"/>
+    <line x1="16" y1="25" x2="16" y2="29"/>
+    <line x1="3" y1="16" x2="7" y2="16"/>
+    <line x1="25" y1="16" x2="29" y2="16"/>
+    <line x1="6.8" y1="6.8" x2="9.6" y2="9.6"/>
+    <line x1="22.4" y1="22.4" x2="25.2" y2="25.2"/>
+    <line x1="6.8" y1="25.2" x2="9.6" y2="22.4"/>
+    <line x1="22.4" y1="9.6" x2="25.2" y2="6.8"/>
+  </g>
+</svg>"""
+
+_THEME_DARK_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <path d="M26 18.5A10 10 0 0 1 13.5 6 10 10 0 1 0 26 18.5z"
+        stroke="{color}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>"""
+
+_LANG_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <circle cx="16" cy="16" r="12" stroke="{color}" stroke-width="2" fill="none"/>
+  <ellipse cx="16" cy="16" rx="6" ry="12" stroke="{color}" stroke-width="1.5" fill="none"/>
+  <line x1="4" y1="12" x2="28" y2="12" stroke="{color}" stroke-width="1.5"/>
+  <line x1="4" y1="20" x2="28" y2="20" stroke="{color}" stroke-width="1.5"/>
+</svg>"""
+
+_PLACEHOLDER_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <polygon points="16,4 28,16 16,28 4,16" stroke="{color}" stroke-width="2"
+           fill="none" stroke-linejoin="round"/>
+</svg>"""
+
+
+def _render_svg(svg_template, color_hex, size=32):
+    """Render an inline SVG template to a QPixmap."""
+    svg_str = svg_template.format(color=color_hex)
+    renderer = QSvgRenderer(QByteArray(svg_str.encode("utf-8")))
+    pixmap = QPixmap(size, size)
+    pixmap.fill(QColor(0, 0, 0, 0))
+    painter = QPainter(pixmap)
+    renderer.render(painter)
+    painter.end()
+    return pixmap
+
+
+def make_nav_icon(svg_template, color_hex, size=24):
+    """Create a QIcon from an SVG template for navigation use."""
+    return QIcon(_render_svg(svg_template, color_hex, size))
+
 
 PLACEHOLDER_COLORS = {
     "backgrounds": QColor(60, 90, 140),
@@ -62,11 +138,57 @@ class IconProvider:
         self.icons_dir = icons_dir
         self.size = size
         self._cache = {}
+        self._svg_cache = {}
         self._missing = set()
         self._icons_available = os.path.isdir(icons_dir)
         self._perk_icon_map = {}
         if self._icons_available:
             self._build_perk_map()
+
+    # ── SVG nav/UI icons (theme-aware) ───────────────────────────
+
+    NAV_ICONS = {
+        "forward": _NAV_FORWARD_SVG,
+        "reverse": _NAV_REVERSE_SVG,
+        "builds": _NAV_BUILDS_SVG,
+        "about": _NAV_ABOUT_SVG,
+    }
+
+    def get_nav_icon(self, name, color_hex, size=24):
+        cache_key = ("nav", name, color_hex, size)
+        if cache_key in self._svg_cache:
+            return self._svg_cache[cache_key]
+        svg = self.NAV_ICONS.get(name)
+        if svg is None:
+            return QIcon()
+        icon = make_nav_icon(svg, color_hex, size)
+        self._svg_cache[cache_key] = icon
+        return icon
+
+    def get_theme_icon(self, is_dark, color_hex, size=18):
+        cache_key = ("theme", is_dark, color_hex, size)
+        if cache_key in self._svg_cache:
+            return self._svg_cache[cache_key]
+        svg = _THEME_DARK_SVG if is_dark else _THEME_LIGHT_SVG
+        icon = make_nav_icon(svg, color_hex, size)
+        self._svg_cache[cache_key] = icon
+        return icon
+
+    def get_lang_icon(self, color_hex, size=18):
+        cache_key = ("lang", color_hex, size)
+        if cache_key in self._svg_cache:
+            return self._svg_cache[cache_key]
+        icon = make_nav_icon(_LANG_SVG, color_hex, size)
+        self._svg_cache[cache_key] = icon
+        return icon
+
+    def get_placeholder_pixmap(self, color_hex, size=28):
+        cache_key = ("placeholder", color_hex, size)
+        if cache_key in self._svg_cache:
+            return self._svg_cache[cache_key]
+        pix = _render_svg(_PLACEHOLDER_SVG, color_hex, size)
+        self._svg_cache[cache_key] = pix
+        return pix
 
     @staticmethod
     def _normalize_perk_name(name):

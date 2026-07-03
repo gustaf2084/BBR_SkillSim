@@ -66,7 +66,8 @@ class BuildsTab(QWidget):
         # ── LEFT: background list ──
         left = QWidget()
         lv = QVBoxLayout(left)
-        lv.setSpacing(6)
+        lv.setContentsMargins(0, 12, 0, 0)
+        lv.setSpacing(8)
 
         self._bg_label = QLabel(t("builds.bg_label"))
         self._bg_label.setObjectName("section_title")
@@ -89,8 +90,8 @@ class BuildsTab(QWidget):
         # ── RIGHT: content area ──
         right = QWidget()
         rv = QVBoxLayout(right)
-        rv.setContentsMargins(0, 0, 0, 0)
-        rv.setSpacing(8)
+        rv.setContentsMargins(24, 8, 24, 0)
+        rv.setSpacing(10)
 
         # title
         self.title = QLabel("")

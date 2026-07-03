@@ -108,6 +108,8 @@ class ReverseTab(QWidget):
         # ===== LEFT: target selection =====
         left = QWidget()
         lv = QVBoxLayout(left)
+        lv.setContentsMargins(0, 12, 0, 0)
+        lv.setSpacing(10)
         lv.setSpacing(8)
 
         self._target_title = QLabel(t("reverse.target_title"))
@@ -135,7 +137,7 @@ class ReverseTab(QWidget):
         # advanced (true collapsible section)
         self._adv_sec = CollapsibleSection(t("reverse.advanced"), expanded=False)
         adv_form = QFormLayout(self._adv_sec.content)
-        adv_form.setContentsMargins(10, 8, 10, 8)
+        adv_form.setContentsMargins(12, 8, 12, 8)
 
         self.multi_trait_check = QCheckBox(t("reverse.multi_trait"))
         adv_form.addRow(self.multi_trait_check)
@@ -182,7 +184,7 @@ class ReverseTab(QWidget):
         # ===== RIGHT: results =====
         right = QWidget()
         rv = QVBoxLayout(right)
-        rv.setContentsMargins(0, 0, 0, 0)
+        rv.setContentsMargins(24, 8, 24, 0)
 
         self.result_title = QLabel(t("reverse.result_title_ph"))
         self.result_title.setObjectName("page_title")
