@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
-"""perk_zh.py — 技能名称和描述的中英映射.
+"""Chinese perk name and description lookup.
 
-数据存储于 perk_i18n.json，本模块为薄封装层。
-英文描述直接取自 data.json perk_trees,中文按英文原文完整直译.
+The source data is stored in perk_i18n.json.  Perk names in perk_trees.json
+sometimes differ only by qualifier spelling, for example:
+
+    Line Breaker (requires Shield)
+    Line Breaker (Requires Shield)
+
+or by whether the qualifier includes the leading "requires".  The lookup layer
+normalizes those forms so Chinese UI does not fall back to English text.
 """
 
 import json
@@ -10,73 +16,123 @@ import os
 import re
 import sys
 
+_QUALIFIER_RE = re.compile(r"\s*\(([^)]*)\)\s*$")
+_ZH_QUALIFIER_RE = re.compile(r"\s*[\(（][^()（）]*[\)）]\s*$")
+_REQUIRES_RE = re.compile(r"^requires\s+", re.IGNORECASE)
+
 
 def _app_dir():
     """Return the directory containing data files (supports PyInstaller frozen)."""
     if getattr(sys, "frozen", False):
-        # PyInstaller onefile: bundled data is extracted to sys._MEIPASS
+        # PyInstaller onefile: bundled data is extracted to sys._MEIPASS.
         if hasattr(sys, "_MEIPASS"):
             return sys._MEIPASS
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
 
 
-def _load_i18n():
-    """加载 perk_i18n.json，返回 (name_map, desc_map) 两个字典。
+def _squash_spaces(value):
+    return re.sub(r"\s+", " ", value).strip().lower()
 
-    对带限定语（如 "(requires ...)"）的条目，同时注册去限定语的键，
-    使纯名字节点（如 Swift/Tier2 的 "Vigorous Assault"）也能命中。
-    """
+
+def _split_qualifier(en_name):
+    """Return (base, qualifier) for a perk display name."""
+    name = en_name.strip()
+    match = _QUALIFIER_RE.search(name)
+    if not match:
+        return name, ""
+    base = name[: match.start()].strip()
+    qualifier = match.group(1).strip()
+    return base, qualifier
+
+
+def _normalized_base_key(en_name):
+    base, _ = _split_qualifier(en_name)
+    return _squash_spaces(base)
+
+
+def _normalized_full_key(en_name):
+    base, qualifier = _split_qualifier(en_name)
+    base_key = _squash_spaces(base)
+    if not qualifier:
+        return base_key
+    qualifier = _REQUIRES_RE.sub("", qualifier).strip()
+    qualifier_key = _squash_spaces(qualifier)
+    return f"{base_key} ({qualifier_key})"
+
+
+def _strip_zh_qualifier(zh_name):
+    return _ZH_QUALIFIER_RE.sub("", zh_name).strip()
+
+
+def _add_if_absent(mapping, key, value):
+    if key and value and key not in mapping:
+        mapping[key] = value
+
+
+def _register_translation(mapping, en_name, value, *, strip_zh=False):
+    """Register exact, normalized-full, and base-name lookup keys."""
+    if not value:
+        return
+
+    base_value = _strip_zh_qualifier(value) if strip_zh else value
+    mapping[("exact", en_name)] = value
+    _add_if_absent(mapping, ("full", _normalized_full_key(en_name)), value)
+    _add_if_absent(mapping, ("base", _normalized_base_key(en_name)), base_value)
+
+
+def _load_i18n():
+    """Load perk_i18n.json and return name/description lookup maps."""
     path = os.path.join(_app_dir(), "perk_i18n.json")
     try:
         with open(path, "r", encoding="utf-8") as f:
             raw = json.load(f)
     except Exception:
-        # 返回空映射作为降级（翻译缺失时显示英文原名）
+        # Degrade gracefully: callers will show the original English name.
         return {}, {}
 
     name_map = {}
     desc_map = {}
     for en_name, entry in raw.items():
-        zh_name = entry.get("zh")
-        zh_desc = entry.get("desc_zh")
-        if zh_name:
-            name_map[en_name] = zh_name
-            # 若名字带末尾限定语 (requires ...) / (effect) / (skill)，同时注册纯名字键
-            base = re.sub(r"\s*\([^)]*\)\s*$", "", en_name).strip()
-            if base != en_name and base not in name_map:
-                name_map[base] = re.sub(r"\s*（[^）]*）\s*$", "", zh_name).strip()
-        if zh_desc:
-            desc_map[en_name] = zh_desc
-            # 同样为纯名字键注册描述
-            base = re.sub(r"\s*\([^)]*\)\s*$", "", en_name).strip()
-            if base != en_name and base not in desc_map:
-                desc_map[base] = zh_desc
+        _register_translation(name_map, en_name, entry.get("zh"), strip_zh=True)
+        _register_translation(desc_map, en_name, entry.get("desc_zh"))
     return name_map, desc_map
+
+
+def _lookup(mapping, en_name, fallback):
+    exact = mapping.get(("exact", en_name))
+    if exact:
+        return exact
+
+    full = mapping.get(("full", _normalized_full_key(en_name)))
+    if full:
+        return full
+
+    base = mapping.get(("base", _normalized_base_key(en_name)))
+    if base:
+        return base
+
+    return fallback
 
 
 _NAME_MAP, _DESC_MAP = _load_i18n()
 
 
 def get_perk_name_zh(en_name):
-    """获取技能的中文名，无翻译时返回原名。"""
-    return _NAME_MAP.get(en_name, en_name)
+    """Return a perk's Chinese name, or the original English name if missing."""
+    return _lookup(_NAME_MAP, en_name, en_name)
 
 
 def get_perk_desc_zh(en_name):
-    """获取技能的中文描述，无翻译时返回空字符串。"""
-    return _DESC_MAP.get(en_name, "")
+    """Return a perk's Chinese description, or an empty string if missing."""
+    return _lookup(_DESC_MAP, en_name, "")
 
 
 def get_perk_name_en(en_name):
-    """英文模式下直接返回英文名（即键）。"""
+    """English mode uses the original English display name."""
     return en_name
 
 
 def get_perk_desc_en(en_name):
-    """英文模式下返回英文原文描述。
-
-    英文原文存储在 data.json 的 perk_trees 中（格式 "名字\\n描述"）。
-    本函数仅作占位；实际英文描述由 widget 使用 skill_desc 字段。
-    """
+    """English descriptions are supplied directly by the skill tree widget."""
     return ""
