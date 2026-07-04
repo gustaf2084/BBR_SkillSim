@@ -8,6 +8,7 @@ Battle Brothers Reforged 模组的角色 build 概率分析工具。输入背景
 - **反向推导** — 选目标技能树组（可多选），找出最佳背景+特性组合
 - **流派推荐** — 浏览各背景的高概率技能树组参考，支持自定义流派方案文件
 - **技能树可视化** — 7 阶矩阵展示每个组的 perk 树，带图标和中/英文描述
+- **全量图标** — 背景与技能组均有游戏图标（背景选择、目标组勾选、结果表、技能树列头）
 - **导出功能** — 复制结果文本或导出 CSV 文件
 - **深色主题** — 导航栏底部一键切换深/浅主题，设置自动保存
 
@@ -189,7 +190,7 @@ python -m pytest tests/ -v
 
 ## 数据来源
 
-基于 Battle Brothers Reforged 0.7.6 模组数据解析生成，技能图标来自原版 BB Wiki 和 Reforged 模组资源。
+基于 Battle Brothers Reforged 0.7.6 模组数据解析生成，技能/背景图标来自原版 BB Wiki（Character Backgrounds / Perks 页面）和 Reforged 模组资源（技能组图标、老剑圣背景）。
 
 ## License
 

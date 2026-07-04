@@ -5,7 +5,7 @@ Reverse derivation page: select target skill tree groups (multi-select), find be
 background + trait combinations.
 """
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import QSize, Qt, QThread, Signal
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
     QApplication,
@@ -364,6 +364,9 @@ class ReverseTab(QWidget):
                 cb = QCheckBox(self.gd.group_name(g))
                 cb.setToolTip(g)
                 cb.setProperty("group_id", g)
+                if self.icon_provider is not None:
+                    cb.setIcon(self.icon_provider.get_icon(g, "groups", 18))
+                    cb.setIconSize(QSize(18, 18))
                 cb.setChecked(g in selected_targets)
                 cbs.append((cb, g))
                 row, col = divmod(i, 2)

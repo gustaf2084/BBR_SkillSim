@@ -306,6 +306,8 @@ class BuildsTab(QWidget):
         for bg_id in gd.filtered_complete_backgrounds():
             item = QListWidgetItem(gd.bg_name(bg_id))
             item.setData(Qt.UserRole, bg_id)
+            if icon_provider is not None:
+                item.setIcon(icon_provider.get_icon(bg_id, "backgrounds", 24))
             self.bg_list.addItem(item)
             if bg_id == prev_bg_id:
                 restore_row = self.bg_list.count() - 1

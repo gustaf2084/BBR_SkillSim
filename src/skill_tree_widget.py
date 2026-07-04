@@ -353,7 +353,7 @@ class ColumnHeaderOverlay(QWidget):
     def mouseMoveEvent(self, event):
         col = self._col_at(event.position().x())
         if 0 <= col < len(self._view._col_headers):
-            label, prob = self._view._col_headers[col]
+            label, prob = self._view._col_headers[col][:2]
             QToolTip.showText(event.globalPosition().toPoint(),
                               f"{label}  ({prob*100:.1f}%)", self)
         else:
@@ -385,7 +385,9 @@ class ColumnHeaderOverlay(QWidget):
         painter.setFont(self._view._hdr_font)
         fm = painter.fontMetrics()
 
-        for col, (label, prob) in enumerate(headers):
+        for col, header in enumerate(headers):
+            label, prob = header[0], header[1]
+            icon_pix = header[2] if len(header) > 2 else None
             # scene → viewport via transform (float-precise, avoids
             # mapFromScene int truncation), then + viewport.x() → overlay coords.
             tr = self._view.viewportTransform()
@@ -410,12 +412,20 @@ class ColumnHeaderOverlay(QWidget):
             painter.setPen(QPen(pc.darker(130), 1))
             painter.drawRect(QRectF(x + 4, COL_HEADER_H - 10, 5, 6))
 
+            # group icon (20x20, vertically centered above the border line)
+            text_left = x + 12
+            if icon_pix is not None and not icon_pix.isNull():
+                icon_y = (COL_HEADER_H - 1 - 20) // 2
+                painter.drawPixmap(x + 12, icon_y, 20, 20, icon_pix)
+                text_left = x + 36
+
             # column name (elided; full name available via hover tooltip)
             text_color = accent if col == highlight_col \
                 else QColor(theme.c("matrix_header_text"))
             painter.setPen(text_color)
-            elided = fm.elidedText(label, Qt.ElideRight, CELL_W - 16)
-            painter.drawText(QRectF(x + 12, 2, CELL_W - 16, COL_HEADER_H - 8),
+            avail = CELL_W - (text_left - x) - 4
+            elided = fm.elidedText(label, Qt.ElideRight, avail)
+            painter.drawText(QRectF(text_left, 2, avail, COL_HEADER_H - 8),
                            Qt.AlignLeft | Qt.AlignVCenter, elided)
 
         painter.end()
@@ -732,8 +742,13 @@ class SkillTreeWidget(QWidget):
                 node.setPos(x, y)
                 self._scene.addItem(node)
 
-        headers = [(t.get("group_name", t["group_id"]), t.get("probability", 0))
-                   for t in active]
+        headers = []
+        for tree in active:
+            gid = tree["group_id"]
+            icon_pix = (self._icon_provider.get_pixmap(gid, "groups", 20)
+                        if self._icon_provider else None)
+            headers.append((tree.get("group_name", gid),
+                            tree.get("probability", 0), icon_pix))
         self._view.set_col_headers(headers)
         self._view.viewport().update()  # force repaint so drawForeground picks up new headers
         ncols = len(active)

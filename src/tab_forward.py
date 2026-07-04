@@ -352,7 +352,11 @@ class ForwardTab(QWidget):
         bg_names = []
         for bg_id in filtered:
             zh = gd.bg_name(bg_id)
-            self.bg_combo.addItem(zh, bg_id)
+            if icon_provider is not None:
+                self.bg_combo.addItem(
+                    icon_provider.get_icon(bg_id, "backgrounds", 24), zh, bg_id)
+            else:
+                self.bg_combo.addItem(zh, bg_id)
             bg_names.append(zh)
         self._bg_model.setStringList(bg_names)
         if filtered:
