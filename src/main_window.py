@@ -134,6 +134,12 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Save session state before closing."""
+        # 先停掉仍在运行的反向推导后台线程，避免「线程仍在运行时被销毁」崩溃
+        rev = getattr(self, "reverse_tab", None)
+        worker = getattr(rev, "_worker", None) if rev else None
+        if worker is not None and worker.isRunning():
+            worker.requestInterruption()
+            worker.wait(5000)  # 等其退出；解析模式远小于此，MC 极重任务可能超时
         s = _load_settings(exe_dir())
         # Window geometry
         g = self.geometry()

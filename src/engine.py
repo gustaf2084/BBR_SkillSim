@@ -24,7 +24,8 @@ engine.py
       使非保证但有正权重的专属组获得真实概率，v0.3.0）
 
 两种计算模式：
-  - analytic（解析近似）：类别内按合成权重归一，P(出现)=1-(1-p)^n
+  - analytic（解析）：类别内做无放回加权抽样的精确动态规划，求 target 至少
+    被抽中一次的概率（刻意不用有放回的 1-(1-p)^n 近似，与游戏机制一致）
   - monte_carlo（蒙特卡洛）：固定种子大量抽样统计经验概率
 
 公开 API:
@@ -115,10 +116,10 @@ class SkillEngine:
         # forward 结果 LRU：命中移到末尾，淘汰最久未用
         self._forward_cache: OrderedDict = OrderedDict()   # key -> OrderedDict | None (analytic only)
         self._forward_cache_max: int = 200
-        # (target, 权重签名, n) -> 顶层出现概率；容量超限整体清空
+        # (target, 权重签名, n) -> 顶层出现概率；容量超限时淘汰最早插入的一条(FIFO)
         self._norepl_cache: dict[tuple, float] = {}
         self._norepl_cache_max: int = 50000
-        # (bg, traits, cat, branch, 开关) -> 类别权重池；容量超限整体清空
+        # (bg, traits, cat, branch, 开关) -> 类别权重池；容量超限时淘汰最早插入的一条(FIFO)
         self._pool_cache: dict[tuple, dict[str, float]] = {}
         self._pool_cache_max: int = 20000
         # 按背景缓存的天赋星期望 / 11 级投影属性（只依赖 bg_id，重算是纯浪费）
@@ -374,7 +375,9 @@ class SkillEngine:
         if mode == "none":
             return [([], 1.0)]
         if mode == "fixed":
-            return [([exc.get("group")], 1.0)]
+            grp = exc.get("group")
+            # group 缺失（数据写错）时退化为无专属，避免产生 [None] 伪组
+            return [([grp], 1.0)] if grp else [([], 1.0)]
         if mode == "prob":
             picks: dict[str, float] = exc.get("picks", {})
             none_chance: float = exc.get("none_chance", 0.0)
@@ -431,13 +434,13 @@ class SkillEngine:
 
     def _appear_prob_no_replacement(self, weights_dict: dict[str, float], target: str, n: float) -> float:
         """
-        无放回抽样的解析近似：类别内骰 n 组，计算 target 至少被抽中一次的概率。
+        无放回抽样的精确解析解：类别内骰 n 组，计算 target 至少被抽中一次的概率。
         weights_dict: {group: weight}（仅正权重组）
-        算法：逐轮计算"本轮未抽中 target"的概率并连乘。
-          每轮，target 未被抽中的边际概率 = 1 - w_target/total。
-          抽中非 target 组后，该组被移出，剩余权重重新归一。
-          由于"抽中哪个非target组"会影响 target 后续权重占比，这里用按权重加权
-          的期望更新（对 target 占比做一阶近似），在组数≤12、n≤5 时精度足够。
+        算法：按 (剩余组集合 mask, 剩余轮数 k) 状态空间做动态规划——
+          P(mask, k) = w_target / total                              # 本轮直接抽中 target
+                     + Σ_{i≠target} w_i/total · P(mask 去掉 i, k-1)  # 本轮抽中 i 后，
+                                                                     # 从剩余池再抽 k-1 轮命中 target
+          枚举所有「非 target 组被先抽走」的路径并精确加权，无任何近似。
         顶层结果使用实例级缓存（带容量上限）；(mask, k) 子结果仅在单次调用内
         记忆化——它们依赖 target 与权重签名，跨调用不可复用，实例级存储只会
         无界膨胀内存。
@@ -517,7 +520,7 @@ class SkillEngine:
                              use_projected: bool = True,
                              talent_stars: dict[str, float] | None = None) -> float:
         """
-        解析近似计算单组出现概率（无放回抽样模型，与游戏机制一致）。
+        解析（精确无放回）计算单组出现概率，与游戏机制一致。
         思路:
           - 该组所属类别 C 骰 n 组（无放回）
           - 考虑专属组分支：对每个 exclusive 分支，按级联权重合成该类别内各组权重，
@@ -840,6 +843,9 @@ class SkillEngine:
 
         if not any_available:
             if mode == "analytic":
+                # 与成功路径一致：存 None 前先腾出 LRU 槽位，避免空结果无界堆积
+                if len(self._forward_cache) >= self._forward_cache_max:
+                    self._forward_cache.popitem(last=False)
                 self._forward_cache[cache_key] = None
             return None
 
