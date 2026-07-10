@@ -14,28 +14,18 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 import theme
+from app_paths import external_app_dir, resolve_resource
 from i18n import t
 
 
 def get_app_dir():
     """Return the directory containing the executable (supports PyInstaller frozen)."""
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
+    return external_app_dir()
 
 
 def locate_data_json():
     """Find data.json: prefer exe-adjacent copy (user-updatable), else bundled fallback."""
-    external = os.path.join(get_app_dir(), "data.json")
-    if os.path.isfile(external):
-        return external
-    # PyInstaller onefile mode: resources are in _MEIPASS temp directory
-    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-        bundled = os.path.join(sys._MEIPASS, "data.json")
-        if os.path.isfile(bundled):
-            return bundled
-    # Fallback: still return the adjacent path so loading logic gives a clear error
-    return external
+    return resolve_resource("data.json")
 
 
 def load_user_qss_override():

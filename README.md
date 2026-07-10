@@ -80,8 +80,8 @@ pyinstaller build_safe.spec
 **Q: 为什么某些背景不显示？**
 A: 数据不完整的背景（缺少必要字段）已被隐藏，可在「关于」页查看隐藏列表。
 
-**Q: 蒙特卡洛模式和解析近似有什么区别？**
-A: 解析近似基于无放回抽样的精确递归，日常使用精度足够（与蒙特卡洛偏差在采样噪声内）。蒙特卡洛模式对完整角色生成做 20000 次联合采样统计经验概率，两者速度都在亚秒级。
+**Q: 蒙特卡洛模式和解析模式有什么区别？**
+A: 解析模式使用无放回抽样的精确动态规划，与游戏骰组机制一致。蒙特卡洛模式对完整角色生成做 20000 次联合采样，主要用于正向结果交叉验证；反向推导固定使用更快、更稳定的解析模式。
 
 **Q: 反向推导的「次要组干扰」是什么意思？**
 A: 干扰值衡量非目标组的累积概率与目标组概率之比。值越低越纯粹。0-0.5 表示目标组是唯一高概率组；>2.0 表示多个非目标组也有高概率，目标不专一。
@@ -103,6 +103,7 @@ BBR_SkillSim/
 ├── README.md
 ├── requirements.txt
 ├── requirements-dev.txt
+├── constraints-ci.txt   # CI/发布构建的顶层依赖版本约束
 ├── pyproject.toml       # ruff + mypy + pytest 配置
 ├── .github/workflows/   # GitHub Actions CI
 ├── tests/               # 单元测试 (pytest)
@@ -110,10 +111,11 @@ BBR_SkillSim/
 │   └── test_data_loader.py
 └── src/
     ├── main.py          # 入口
+    ├── app_paths.py     # 开发/PyInstaller 资源路径统一解析
     ├── main_window.py   # 主窗口（导航、快捷键、窗口状态持久化、主题切换）
     ├── theme.py         # 设计令牌单一数据源（浅/深两套调色板 + 全局 QSS 生成）
     ├── ui_components.py # 可复用组件（空状态、便签提示、折叠面板）
-    ├── engine.py        # 概率引擎（解析近似 + 蒙特卡洛模拟 + 反向推导剪枝）
+    ├── engine.py        # 概率引擎（精确解析 + 蒙特卡洛模拟 + 反向推导剪枝）
     ├── data_loader.py   # 数据加载与验证（含懒加载 perk_trees）
     ├── i18n.py          # 中/英文翻译
     ├── data.json        # 结构化数据（背景/特性/技能树组）
@@ -134,7 +136,7 @@ BBR_SkillSim/
 
 ### 概率引擎算法
 
-**正向模拟（解析近似）：**
+**正向模拟（精确解析）：**
 1. 根据背景和特性计算各组权重：raw_weight = (base_p * multiplier) * attribute_weight * projected_attribute + trait_weights
 2. 处理专属组：对每个 exclusive 分支，按级联权重分配
 3. 类别内无放回抽样：从该类别骰 n 组（n = 默认基线 + 背景修正；小数部分 f 表示有 f 概率额外骰一次，如 Exclusive 基线 0.5），计算每个组至少被抽中一次的概率
@@ -179,6 +181,8 @@ BBR_SkillSim/
 cd BBR_SkillSim
 pip install -r requirements-dev.txt
 python -m pytest tests/ -v
+python -m ruff check src tests
+python -m mypy src
 ```
 
 ### 版本号规则
@@ -190,7 +194,7 @@ python -m pytest tests/ -v
 
 ## 数据来源
 
-基于 Battle Brothers Reforged 0.7.6 模组数据解析生成，技能/背景图标来自原版 BB Wiki（Character Backgrounds / Perks 页面）和 Reforged 模组资源（技能组图标、老剑圣背景）。
+当前权重与技能树数据基于 Battle Brothers Reforged 0.9.1 源码解析生成；0.9.1 未提供的基础概率矩阵沿用 0.7.6 表格基线。技能/背景图标来自原版 BB Wiki 和 Reforged 模组资源。
 
 ## License
 

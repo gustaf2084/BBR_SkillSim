@@ -12,23 +12,13 @@ normalizes those forms so Chinese UI does not fall back to English text.
 """
 
 import json
-import os
 import re
-import sys
+
+from app_paths import resolve_resource
 
 _QUALIFIER_RE = re.compile(r"\s*\(([^)]*)\)\s*$")
 _ZH_QUALIFIER_RE = re.compile(r"\s*[\(（][^()（）]*[\)）]\s*$")
 _REQUIRES_RE = re.compile(r"^requires\s+", re.IGNORECASE)
-
-
-def _app_dir():
-    """Return the directory containing data files (supports PyInstaller frozen)."""
-    if getattr(sys, "frozen", False):
-        # PyInstaller onefile: bundled data is extracted to sys._MEIPASS.
-        if hasattr(sys, "_MEIPASS"):
-            return sys._MEIPASS
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
 
 
 def _squash_spaces(value):
@@ -83,7 +73,7 @@ def _register_translation(mapping, en_name, value, *, strip_zh=False):
 
 def _load_i18n():
     """Load perk_i18n.json and return name/description lookup maps."""
-    path = os.path.join(_app_dir(), "perk_i18n.json")
+    path = resolve_resource("perk_i18n.json")
     try:
         with open(path, "r", encoding="utf-8") as f:
             raw = json.load(f)

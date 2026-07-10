@@ -12,6 +12,7 @@ _src = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 if _src not in sys.path:  # conftest.py 已注入；直接运行本文件时兜底
     sys.path.insert(0, _src)
 
+import data_loader
 from data_loader import HIDDEN_BACKGROUNDS, DataError, GameData, load_data
 
 DATA_PATH = os.path.join(_src, "data.json")
@@ -98,6 +99,23 @@ class TestLoadData:
         path = temp_json(minimal, name="minimal_ok.json")
         gd = load_data(path, strict=True, strict_version=False)
         assert isinstance(gd, GameData)
+
+    def test_save_settings_uses_atomic_replace(self, monkeypatch, tmp_path):
+        replaced = []
+        real_replace = os.replace
+
+        def record_replace(source, destination):
+            replaced.append((source, destination))
+            real_replace(source, destination)
+
+        monkeypatch.setattr(data_loader.os, "replace", record_replace)
+        data_loader._save_settings(str(tmp_path), {"theme": "dark"})
+
+        settings_path = tmp_path / "settings.json"
+        assert json.loads(settings_path.read_text(encoding="utf-8")) == {"theme": "dark"}
+        assert len(replaced) == 1
+        assert replaced[0][1] == str(settings_path)
+        assert not list(tmp_path.glob("settings.json.*.tmp"))
 
 
 class TestGameDataProperties:

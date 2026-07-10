@@ -39,9 +39,9 @@ _add("prob.low",     "小概率",  "Unlikely")
 _add("prob.none",    "不出现",  "None")
 
 # ── shared: mode ──
-_add("mode.analytic", "快速（解析近似）",       "Fast (analytic approx.)")
-_add("mode.monte",    "精确（蒙特卡洛）",        "Exact (Monte Carlo)")
-_add("mode.monte_slow","精确（蒙特卡洛，较慢）",  "Exact (Monte Carlo, slower)")
+_add("mode.analytic", "精确解析",               "Exact analytic")
+_add("mode.monte",    "蒙特卡洛抽样",           "Monte Carlo sampling")
+_add("mode.monte_slow","蒙特卡洛抽样（较慢）",   "Monte Carlo sampling (slower)")
 
 # ── shared: common ──
 _add("common.none_solution", "无可用方案",        "No valid build")
@@ -284,6 +284,13 @@ _add("parser.bad_format",   "第 {0} 行：格式应为 '序号 = 组名, 层级
 _add("error.global_title",  "发生错误",                "Error Occurred")
 _add("error.global_body",   "程序遇到未处理的错误：\n\n{0}\n\n详细信息已记录。\n\n{1}",
       "The program encountered an unhandled error:\n\n{0}\n\nDetails have been recorded.\n\n{1}")
+_add("error.data_load_title", "数据加载失败", "Data Load Failed")
+_add("error.data_load_no_details", "无详细信息", "No details")
+_add("error.data_load_path", "数据文件：{0}", "Data file: {0}")
+_add("error.data_load_hint", "请将 data.json 放在程序同级目录后重试。",
+      "Put data.json next to the executable and retry.")
+_add("error.retry", "重试", "Retry")
+_add("error.retry_failed", "重试失败", "Retry Failed")
 
 # ── Language state ──
 _current = "zh"

@@ -2,7 +2,6 @@
 """main_window.py - left nav + right stacked pages + language/theme toggle."""
 
 import os
-import sys
 import traceback
 
 from PySide6.QtCore import QSize, Qt
@@ -23,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 import theme
+from app_paths import external_app_dir, resolve_resource
 from data_loader import _load_settings, _save_settings, load_data
 from engine import SkillEngine
 from i18n import set_lang as i18n_set_lang
@@ -35,16 +35,8 @@ NAV_KEYS = ["nav.forward", "nav.reverse", "nav.builds", "nav.about"]
 
 def _read_version():
     """Read version from VERSION file (one line). Falls back to 'dev'."""
-    # Primary: VERSION next to exe (frozen) or in src/ (dev with VERSION copied)
-    version_file = os.path.join(exe_dir(), "VERSION")
     try:
-        with open(version_file, "r", encoding="utf-8") as f:
-            return f.read().strip()
-    except Exception:
-        pass
-    # Fallback: project root (dev mode where VERSION is ../ relative to src)
-    try:
-        version_file = os.path.join(os.path.dirname(exe_dir()), "VERSION")
+        version_file = resolve_resource("VERSION", include_project_root=True)
         with open(version_file, "r", encoding="utf-8") as f:
             return f.read().strip()
     except Exception:
@@ -52,9 +44,7 @@ def _read_version():
 
 
 def exe_dir():
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
+    return external_app_dir()
 
 
 def _user_qss_override():
@@ -88,7 +78,7 @@ class MainWindow(QMainWindow):
         self._data_error = None
 
         if data_path is None:
-            data_path = os.path.join(exe_dir(), "data.json")
+            data_path = resolve_resource("data.json")
         self.data_path = data_path
 
         # lang
@@ -139,7 +129,9 @@ class MainWindow(QMainWindow):
         worker = getattr(rev, "_worker", None) if rev else None
         if worker is not None and worker.isRunning():
             worker.requestInterruption()
-            worker.wait(5000)  # 等其退出；解析模式远小于此，MC 极重任务可能超时
+            if not worker.wait(5000):
+                event.ignore()
+                return
         s = _load_settings(exe_dir())
         # Window geometry
         g = self.geometry()
@@ -335,22 +327,22 @@ class MainWindow(QMainWindow):
         w = QWidget()
         lay = QVBoxLayout(w)
         lay.setAlignment(Qt.AlignCenter)
-        tt = QLabel("DATA LOAD FAILED")
+        tt = QLabel(t("error.data_load_title"))
         tt.setStyleSheet(f"font-size:22px;font-weight:bold;color:{theme.c('error_border')};")
         tt.setAlignment(Qt.AlignCenter)
         lay.addWidget(tt)
-        detail = self._data_error or "(no details)"
-        m = QLabel(detail + "\n\npath: " + str(self.data_path))
+        detail = self._data_error or t("error.data_load_no_details")
+        m = QLabel(detail + "\n\n" + t("error.data_load_path").format(self.data_path))
         m.setWordWrap(True)
         m.setStyleSheet("font-size:13px;padding:20px;font-family:Consolas,monospace;")
         m.setAlignment(Qt.AlignCenter)
         m.setMaximumWidth(750)
         lay.addWidget(m)
-        hint = QLabel("Put data.json next to the exe and restart.")
+        hint = QLabel(t("error.data_load_hint"))
         hint.setStyleSheet(f"font-size:13px;color:{theme.c('text_muted')};padding:10px;")
         hint.setAlignment(Qt.AlignCenter)
         lay.addWidget(hint)
-        b = QPushButton("Retry")
+        b = QPushButton(t("error.retry"))
         b.clicked.connect(self._retry)
         lay.addWidget(b, 0, Qt.AlignCenter)
         return w
@@ -364,7 +356,7 @@ class MainWindow(QMainWindow):
             self.icon_provider = IconProvider(icons_dir=os.path.join(exe_dir(), "icons"))
             self._data_error = None
         except Exception as e:
-            QMessageBox.critical(self, "Failed", str(e))
+            QMessageBox.critical(self, t("error.retry_failed"), str(e))
             return
         # rebuild
         central = self.centralWidget()

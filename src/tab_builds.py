@@ -30,15 +30,14 @@ from PySide6.QtWidgets import (
 )
 
 import theme
+from app_paths import external_app_dir
 from build_parser import create_example_file, generate_template, scan_builds
 from i18n import t
 from skill_tree_widget import SkillTreeWidget, build_skill_tree_data
 
 
 def _app_dir():
-    if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
+    return external_app_dir()
 
 
 class BuildsTab(QWidget):

@@ -199,6 +199,14 @@ class TestCaching:
         r1 = engine.forward_simulate("no_such_bg", [], mode="analytic")
         assert r1 is None
 
+    def test_cache_distinguishes_empty_talent_override_from_default(self, engine):
+        default_result = engine.forward_simulate(
+            "assassin_background", [], mode="analytic", talent_stars=None)
+        empty_override_result = engine.forward_simulate(
+            "assassin_background", [], mode="analytic", talent_stars={})
+
+        assert default_result is not empty_override_result
+
 
 class TestReverseDerive:
     def test_reverse_derive_dagger(self, engine):
@@ -298,6 +306,46 @@ class TestProgressCallback:
             prune_threshold=20,
             progress_callback=callback)
         assert result.get("cancelled") is True
+
+    def test_cancel_callback_runs_between_trait_combinations(self, engine):
+        checks = []
+
+        def should_cancel():
+            checks.append(True)
+            return len(checks) >= 3
+
+        result = engine.reverse_derive(
+            ["Dagger"], mode="analytic", multi_trait=True, max_traits=2,
+            top_n=3, tiebreak_limit=20, prune_threshold=20,
+            cancel_callback=should_cancel)
+
+        assert result.get("cancelled") is True
+        assert len(checks) == 3
+
+    def test_reverse_monte_carlo_uses_joint_simulation(self, engine, monkeypatch):
+        joint_calls = []
+        cancel_checks = []
+
+        def joint_simulation(bg_id, trait_ids, **_kwargs):
+            joint_calls.append((bg_id, tuple(trait_ids)))
+            return {"Dagger": 0.8, "Sword": 0.6}
+
+        def single_group_simulation(*_args, **_kwargs):
+            raise AssertionError("反推不应逐目标重复执行 Monte Carlo")
+
+        def should_cancel():
+            cancel_checks.append(True)
+            return len(cancel_checks) >= 2
+
+        monkeypatch.setattr(engine, "_forward_monte_carlo_all", joint_simulation)
+        monkeypatch.setattr(engine, "appear_prob_monte_carlo", single_group_simulation)
+        result = engine.reverse_derive(
+            ["Dagger", "Sword"], mode="monte_carlo", top_n=1,
+            tiebreak_limit=1000, prune_threshold=0,
+            cancel_callback=should_cancel)
+
+        assert result.get("cancelled") is True
+        assert len(joint_calls) == 1
 
 
 class TestExclusiveGroups:

@@ -93,6 +93,8 @@ class SkillEngine:
     _norepl_cache_max: int
     _pool_cache: dict[tuple, dict[str, float]]
     _pool_cache_max: int
+    _base_weight_cache: OrderedDict
+    _base_weight_cache_max: int
     _bg_stars_cache: dict[str, dict[str, float]]
     _bg_proj_cache: dict[str, dict[str, float]]
 
@@ -122,6 +124,9 @@ class SkillEngine:
         # (bg, traits, cat, branch, 开关) -> 类别权重池；容量超限时淘汰最早插入的一条(FIFO)
         self._pool_cache: dict[tuple, dict[str, float]] = {}
         self._pool_cache_max: int = 20000
+        # 不含特性与专属级联的背景基础权重；反推会重复使用同一背景/组数千次
+        self._base_weight_cache: OrderedDict = OrderedDict()
+        self._base_weight_cache_max: int = 20000
         # 按背景缓存的天赋星期望 / 11 级投影属性（只依赖 bg_id，重算是纯浪费）
         self._bg_stars_cache: dict[str, dict[str, float]] = {}
         self._bg_proj_cache: dict[str, dict[str, float]] = {}
@@ -264,6 +269,50 @@ class SkillEngine:
             self._bg_proj_cache[bg_id] = projected
         return projected
 
+    @staticmethod
+    def _mapping_key(values: dict[str, float] | None) -> tuple | None:
+        return tuple(sorted(values.items())) if values is not None else None
+
+    def _base_raw_weight(self, bg_id: str, group: str,
+                         use_attribute: bool = True,
+                         use_projected: bool = True,
+                         talent_stars: dict[str, float] | None = None,
+                         projected: dict[str, float] | None = None) -> float:
+        """计算不含特性和专属级联的基础权重，并按输入参数缓存。"""
+        key = (
+            bg_id, group, use_attribute, use_projected,
+            self._mapping_key(talent_stars), self._mapping_key(projected),
+        )
+        if key in self._base_weight_cache:
+            self._base_weight_cache.move_to_end(key)
+            return self._base_weight_cache[key]
+
+        bg = self.gd.backgrounds.get(bg_id, {})
+        gdef = self.gd.groups.get(group, {})
+        base_prob = bg.get("base_probabilities", {}).get(group)
+        self_weight = gdef.get("self_weight")
+        weight = 0.0
+        if base_prob is not None:
+            weight += base_prob * (1.0 if self_weight is None else self_weight)
+
+        multiplier = bg.get("multipliers", {}).get(group)
+        if multiplier is not None:
+            weight += multiplier
+
+        if use_attribute:
+            stars = talent_stars if talent_stars is not None else self._bg_expected_talent_stars(bg_id)
+            weight += self.attribute_star_weight(group, talent_stars=stars)
+
+        if use_projected:
+            projected_values = projected if projected is not None else self._bg_projected_attrs(
+                bg_id, talent_stars=talent_stars)
+            weight += self.projected_attr_weight(group, projected=projected_values)
+
+        if len(self._base_weight_cache) >= self._base_weight_cache_max:
+            self._base_weight_cache.popitem(last=False)
+        self._base_weight_cache[key] = weight
+        return weight
+
     def compute_raw_weight(self, bg_id: str, trait_ids: list[str], group: str,
                            exclusive_active: list[str] | None = None,
                            use_attribute: bool = True,
@@ -290,24 +339,18 @@ class SkillEngine:
         if bg.get("melee_only") and group in RANGED_GROUPS:
             return 0.0
 
-        # 基础概率
-        base_prob = bg.get("base_probabilities", {}).get(group)
-        self_w = gdef.get("self_weight")
-
-        w = 0.0
-        # 基础概率 × self_weight（self_weight 缺省视为 1.0）
-        if base_prob is not None:
-            sw = 1.0 if self_w is None else self_w
-            # self_weight 为 0 表示该组自身系数为 0（如 Ranged/Professional）
-            w += base_prob * sw
-
-        # 背景 multipliers
+        # 背景 multiplier 为 0 时强制禁用，不能被其他正权重重新启用
         mult = bg.get("multipliers", {}).get(group)
-        if mult is not None:
-            # 0 表示禁用
-            if mult == 0.0:
-                return 0.0
-            w += mult
+        if mult == 0.0:
+            return 0.0
+
+        w = self._base_raw_weight(
+            bg_id, group,
+            use_attribute=use_attribute,
+            use_projected=use_projected,
+            talent_stars=talent_stars,
+            projected=projected,
+        )
 
         # 特性权重
         for tid in trait_ids:
@@ -318,17 +361,6 @@ class SkillEngine:
                     if tw == 0.0:
                         return 0.0  # 特性禁用该组
                     w += tw
-
-        # 天赋星
-        if use_attribute:
-            stars = talent_stars if talent_stars is not None else self._bg_expected_talent_stars(bg_id)
-            w += self.attribute_star_weight(group, talent_stars=stars)
-
-        # 投影属性
-        if use_projected:
-            proj = projected if projected is not None else self._bg_projected_attrs(
-                bg_id, talent_stars=talent_stars)
-            w += self.projected_attr_weight(group, projected=proj)
 
         # 专属组级联
         if exclusive_active:
@@ -538,6 +570,8 @@ class SkillEngine:
         cat: str | None = gdef.get("category")
         if cat == "Always":  # General 恒出现
             return 1.0
+        if cat is None:
+            return 0.0
 
         # ── Guaranteed exclusive group: return guarantee probability directly ──
         # The mod resolves exclusive groups via a separate guaranteed mechanism
@@ -573,19 +607,21 @@ class SkillEngine:
                        exc_groups: list[str],
                        use_attribute: bool = True,
                        use_projected: bool = True,
-                       talent_stars: dict[str, float] | None = None) -> dict[str, float]:
+                       talent_stars: dict[str, float] | None = None,
+                       cache_result: bool = True) -> dict[str, float]:
         """合成某类别在给定分支下的正权重池 {group: weight}，带实例级缓存。
 
         权重只依赖 (背景, 特性集合, 类别, 分支, 修正开关)。同一 forward
         模拟对同类别的每个目标组都会用到同一张池——不缓存则重复合成
         len(category) 遍。返回的 dict 为缓存共享对象，调用方不得修改。
         """
-        stars_key = tuple(sorted(talent_stars.items())) if talent_stars else None
+        stars_key = self._mapping_key(talent_stars)
         key: tuple = (bg_id, tuple(sorted(trait_ids)), cat, tuple(exc_groups),
                       use_attribute, use_projected, stars_key)
-        cached = self._pool_cache.get(key)
-        if cached is not None:
-            return cached
+        if cache_result:
+            cached = self._pool_cache.get(key)
+            if cached is not None:
+                return cached
         weights: dict[str, float] = {}
         for g in self._groups_by_cat.get(cat, []):
             w: float = self.compute_raw_weight(
@@ -596,9 +632,10 @@ class SkillEngine:
             )
             if w > 0:
                 weights[g] = w
-        if len(self._pool_cache) >= self._pool_cache_max:
-            self._pool_cache.pop(next(iter(self._pool_cache)), None)
-        self._pool_cache[key] = weights
+        if cache_result:
+            if len(self._pool_cache) >= self._pool_cache_max:
+                self._pool_cache.pop(next(iter(self._pool_cache)), None)
+            self._pool_cache[key] = weights
         return weights
 
     # ------------------------------------------------------------------
@@ -678,6 +715,8 @@ class SkillEngine:
         cat: str | None = gdef.get("category")
         if cat == "Always":
             return 1.0
+        if cat is None:
+            return 0.0
         # ── Guaranteed exclusive group: use direct guarantee probability ──
         # See appear_prob_analytic() for the rationale — the mod resolves
         # exclusive groups via a separate guaranteed mechanism independent
@@ -793,7 +832,7 @@ class SkillEngine:
         cache_key: tuple = ()
         if mode == "analytic":
             cache_key = (bg_id, tuple(sorted(trait_ids)), use_attribute, use_projected,
-                         tuple(sorted(talent_stars.items())) if talent_stars else None)
+                         self._mapping_key(talent_stars))
             if cache_key in self._forward_cache:
                 self._forward_cache.move_to_end(cache_key)  # LRU：命中刷新
                 return self._forward_cache[cache_key]
@@ -828,10 +867,11 @@ class SkillEngine:
             # The mod resolves exclusive groups via a separate guaranteed mechanism
             # independent of the "Exclusive category 0.5× roll" system.
             # The guarantee probability OVERRIDES the normal category roll.
+            p: float
             if cat == "Exclusive" and group in guaranteed_exclusive:
                 p = guaranteed_exclusive[group]
             elif mode == "monte_carlo":
-                p: float = mc_probs.get(group, 0.0)
+                p = mc_probs.get(group, 0.0)
             else:
                 p = self.appear_prob_analytic(
                     bg_id, trait_ids, group,
@@ -878,6 +918,86 @@ class SkillEngine:
             reasons.append("所选组合导致所有可骰类别均无可用组")
         return "；".join(reasons)
 
+    def _analytic_target_probabilities(self, bg_id: str, trait_ids: list[str],
+                                       target_groups: list[str],
+                                       use_attribute: bool,
+                                       use_projected: bool,
+                                       cache_pools: bool) -> dict[str, float]:
+        """一次合成类别池，计算同一组合下多个目标组的解析概率。"""
+        probabilities: dict[str, float] = {}
+        targets_by_category: dict[str, list[str]] = {}
+        guaranteed = self._get_guaranteed_exclusive_probs(bg_id)
+
+        for group in target_groups:
+            group_def = self.gd.groups.get(group)
+            if group_def is None:
+                probabilities[group] = 0.0
+                continue
+            category = group_def.get("category")
+            if category == "Always":
+                probabilities[group] = 1.0
+            elif category == "Exclusive" and group in guaranteed:
+                probabilities[group] = guaranteed[group]
+            elif category is None:
+                probabilities[group] = 0.0
+            else:
+                targets_by_category.setdefault(category, []).append(group)
+
+        branches = self.resolve_exclusive(bg_id)
+        for category, category_targets in targets_by_category.items():
+            rolls = self.num_rolls(bg_id, category)
+            if rolls <= 0:
+                probabilities.update({group: 0.0 for group in category_targets})
+                continue
+
+            category_probs = {group: 0.0 for group in category_targets}
+            for exclusive_groups, branch_probability in branches:
+                if branch_probability <= 0:
+                    continue
+                pool = self._category_pool(
+                    bg_id, trait_ids, category, exclusive_groups,
+                    use_attribute=use_attribute,
+                    use_projected=use_projected,
+                    cache_result=cache_pools,
+                )
+                for group in category_targets:
+                    category_probs[group] += branch_probability * self._appear_prob_no_replacement(
+                        pool, group, rolls)
+
+            for group, probability in category_probs.items():
+                probabilities[group] = min(1.0, max(0.0, probability))
+
+        return probabilities
+
+    def _target_probabilities(self, bg_id: str, trait_ids: list[str],
+                              target_groups: list[str], mode: str,
+                              use_attribute: bool, use_projected: bool,
+                              cache_pools: bool) -> dict[str, float]:
+        """为反推批量计算目标概率；多目标 Monte Carlo 只联合采样一次。"""
+        if mode == "monte_carlo":
+            if len(target_groups) == 1:
+                group = target_groups[0]
+                return {
+                    group: self.appear_prob_monte_carlo(
+                        bg_id, trait_ids, group,
+                        use_attribute=use_attribute,
+                        use_projected=use_projected,
+                    )
+                }
+            forward = self.forward_simulate(
+                bg_id, trait_ids, mode="monte_carlo",
+                use_attribute=use_attribute,
+                use_projected=use_projected,
+            )
+            return {group: forward.get(group, 0.0) if forward else 0.0 for group in target_groups}
+
+        return self._analytic_target_probabilities(
+            bg_id, trait_ids, target_groups,
+            use_attribute=use_attribute,
+            use_projected=use_projected,
+            cache_pools=cache_pools,
+        )
+
     # ------------------------------------------------------------------
     # 反向推导
     # ------------------------------------------------------------------
@@ -892,7 +1012,8 @@ class SkillEngine:
                        top_n: int | None = None,
                        tiebreak_limit: int = 20,
                        prune_threshold: int = 20,
-                       progress_callback: Callable[[int, int], bool | None] | None = None) -> dict[str, Any]:
+                       progress_callback: Callable[[int, int], bool | None] | None = None,
+                       cancel_callback: Callable[[], bool] | None = None) -> dict[str, Any]:
         """
         反向推导：找出使目标组（们）出现概率最大的背景+特性组合。
         参数:
@@ -906,6 +1027,7 @@ class SkillEngine:
           prune_threshold: 两阶段剪枝阈值。>0 时启用剪枝；设为 0 禁用。
           progress_callback: 可选，callable(current, total) — 每完成一个背景调用一次。
             回调返回 True 中断计算（用于取消）。
+          cancel_callback: 可选，无参回调；每个特性组合开始前检查，True 时立即中断。
         返回:
           {
             "max_score": float,
@@ -920,15 +1042,17 @@ class SkillEngine:
         bgs: list[str] = self._complete_bgs_list
         trait_names: list[str] = sorted(gd.traits.keys())
 
-        # 构造待遍历的特性组合
-        if not multi_trait:
-            trait_combos: list[list[str]] = [[]] + [[t] for t in trait_names]
-        else:
+        def iter_trait_combos():
+            """按需生成组合，避免为每个背景长期保留组合列表。"""
+            yield []
+            if not multi_trait:
+                for trait_name in trait_names:
+                    yield [trait_name]
+                return
             from itertools import combinations
-            trait_combos = [[]]
             for k in range(1, max_traits + 1):
                 for combo in combinations(trait_names, k):
-                    trait_combos.append(list(combo))
+                    yield list(combo)
 
         # ── 两阶段剪枝 ──
         # Ensure prune threshold is at least 2× top_n so the candidate pool
@@ -942,19 +1066,14 @@ class SkillEngine:
             # 阶段1: 仅无特性组合，筛选前 prune_threshold 个高分背景
             phase1_scores: list[tuple[str, float]] = []
             for bg_id in bgs:
-                group_probs: dict[str, float] = {}
-                score: float = 0.0
-                for g in target_groups:
-                    if mode == "monte_carlo":
-                        p: float = self.appear_prob_monte_carlo(
-                            bg_id, [], g, use_attribute=use_attribute,
-                            use_projected=use_projected)
-                    else:
-                        p = self.appear_prob_analytic(
-                            bg_id, [], g, use_attribute=use_attribute,
-                            use_projected=use_projected)
-                    group_probs[g] = p
-                    score += weights.get(g, 1.0) * p
+                group_probs = self._target_probabilities(
+                    bg_id, [], target_groups, mode,
+                    use_attribute=use_attribute,
+                    use_projected=use_projected,
+                    cache_pools=True,
+                )
+                score = sum(weights.get(group, 1.0) * probability
+                            for group, probability in group_probs.items())
                 if score > 0:
                     phase1_scores.append((bg_id, score))
             phase1_scores.sort(key=lambda x: -x[1])
@@ -963,8 +1082,8 @@ class SkillEngine:
                 return {"max_score": 0.0, "results": [], "tied_count": 0}
             # 阶段2: 仅对高分背景遍历特性组合
 
-        # ── Collect ALL results (not just max-score) ──
-        all_results: list[tuple[str, tuple[str, ...], float, dict[str, float]]] = []
+        # 每个背景只保留当前最佳组合，避免双特性模式累积十万级中间结果。
+        best_by_background: dict[str, tuple[str, tuple[str, ...], float, dict[str, float]]] = {}
 
         total_bgs: int = len(candidate_bgs)
         for bg_idx, bg_id in enumerate(candidate_bgs):
@@ -974,43 +1093,35 @@ class SkillEngine:
                 if should_cancel:
                     return {"max_score": 0.0, "results": [], "tied_count": 0,
                             "cancelled": True}
-            for combo in trait_combos:
-                # 计算各目标组出现概率
-                group_probs = {}
-                score = 0.0
-                for g in target_groups:
-                    if mode == "monte_carlo":
-                        p = self.appear_prob_monte_carlo(
-                            bg_id, combo, g, use_attribute=use_attribute,
-                            use_projected=use_projected)
-                    else:
-                        p = self.appear_prob_analytic(
-                            bg_id, combo, g, use_attribute=use_attribute,
-                            use_projected=use_projected)
-                    group_probs[g] = p
-                    score += weights.get(g, 1.0) * p
-                if score > 0:
-                    all_results.append((bg_id, tuple(combo), score, group_probs))
+            for combo in iter_trait_combos():
+                if cancel_callback is not None and cancel_callback():
+                    return {"max_score": 0.0, "results": [], "tied_count": 0,
+                            "cancelled": True}
 
-        if not all_results:
+                group_probs = self._target_probabilities(
+                    bg_id, combo, target_groups, mode,
+                    use_attribute=use_attribute,
+                    use_projected=use_projected,
+                    cache_pools=False,
+                )
+                score = sum(weights.get(group, 1.0) * probability
+                            for group, probability in group_probs.items())
+                if score <= 0:
+                    continue
+
+                combo_tuple = tuple(combo)
+                existing = best_by_background.get(bg_id)
+                if existing is None or score > existing[2] + EPS:
+                    best_by_background[bg_id] = (bg_id, combo_tuple, score, group_probs)
+                elif abs(score - existing[2]) <= EPS and combo_tuple < existing[1]:
+                    best_by_background[bg_id] = (bg_id, combo_tuple, score, group_probs)
+
+        if not best_by_background:
             return {"max_score": 0.0, "results": [], "tied_count": 0}
-
-        # ── Dedup: for each bg_id, keep only the highest-scoring row ──
-        # When multi_trait is enabled, the same background may appear with
-        # multiple trait combos; keep only the best-scoring one.
-        # If same score, prefer lexicographically smaller trait combo.
-        deduped: dict[str, tuple[str, tuple[str, ...], float, dict[str, float]]] = {}
-        for bg_id, combo, score, group_probs in all_results:
-            if bg_id not in deduped or score > deduped[bg_id][2] + EPS:
-                deduped[bg_id] = (bg_id, combo, score, group_probs)
-            elif abs(score - deduped[bg_id][2]) <= EPS:
-                existing_combo: tuple[str, ...] = deduped[bg_id][1]
-                if list(combo) < list(existing_combo):
-                    deduped[bg_id] = (bg_id, combo, score, group_probs)
 
         # ── Sort by score descending ──
         deduped_list: list[tuple[str, tuple[str, ...], float, dict[str, float]]] = sorted(
-            deduped.values(), key=lambda x: -x[2])
+            best_by_background.values(), key=lambda x: -x[2])
 
         best_score: float = deduped_list[0][2] if deduped_list else 0.0
 

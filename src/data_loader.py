@@ -2,9 +2,13 @@
 """data_loader.py - load & validate data.json, provide GameData object."""
 
 import json
+import logging
 import os
+import tempfile
 from collections import OrderedDict
 from typing import Any
+
+from app_paths import resource_candidates
 
 
 class DataError(Exception):
@@ -48,6 +52,7 @@ def _build_excluded() -> set[str]:
 EXCLUDED_BACKGROUNDS: set[str] = _build_excluded()
 
 SETTINGS_FILE: str = "settings.json"
+_logger = logging.getLogger(__name__)
 
 
 def _load_settings(app_dir: str) -> dict[str, Any]:
@@ -55,19 +60,36 @@ def _load_settings(app_dir: str) -> dict[str, Any]:
     if os.path.isfile(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+                _logger.warning("settings.json 顶层不是对象，已忽略")
+        except (OSError, json.JSONDecodeError) as exc:
+            _logger.warning("读取 settings.json 失败: %s", exc)
     return {}
 
 
 def _save_settings(app_dir: str, data: dict[str, Any]) -> None:
     path: str = os.path.join(app_dir, SETTINGS_FILE)
+    temp_path: str | None = None
     try:
-        with open(path, "w", encoding="utf-8") as f:
+        os.makedirs(app_dir, exist_ok=True)
+        fd, temp_path = tempfile.mkstemp(
+            prefix=f"{SETTINGS_FILE}.", suffix=".tmp", dir=app_dir, text=True)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, path)
+        temp_path = None
+    except OSError as exc:
+        _logger.warning("写入 settings.json 失败: %s", exc)
+    finally:
+        if temp_path is not None:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
 
 
 class GameData:
@@ -83,6 +105,10 @@ class GameData:
         self.lang = lang
         self._perk_trees: dict[str, Any] | None = None if lazy_perk_trees else data.get("perk_trees", {})
         self._perk_trees_path: str = os.path.join(os.path.dirname(path), "perk_trees.json")
+        self._perk_trees_fallback_paths: list[str] = [
+            candidate for candidate in resource_candidates("perk_trees.json")
+            if candidate != self._perk_trees_path
+        ]
 
     @property
     def meta(self) -> dict[str, Any]: return self._data.get("meta", {})
@@ -118,15 +144,16 @@ class GameData:
 
     def _load_perk_trees_file(self) -> None:
         """Lazy-load perk_trees from separate JSON file."""
-        if os.path.exists(self._perk_trees_path):
+        for path in [self._perk_trees_path, *self._perk_trees_fallback_paths]:
+            if not os.path.exists(path):
+                continue
             try:
-                with open(self._perk_trees_path, "r", encoding="utf-8") as f:
+                with open(path, "r", encoding="utf-8") as f:
                     self._perk_trees = json.load(f, object_pairs_hook=OrderedDict)
+                return
             except Exception as e:
-                self.warnings.append(f"perk_trees load failed: {e}")
-                self._perk_trees = {}
-        else:
-            self._perk_trees = self._data.get("perk_trees", {})
+                self.warnings.append(f"perk_trees load failed ({path}): {e}")
+        self._perk_trees = self._data.get("perk_trees", {})
     @property
     def builds(self) -> dict[str, Any]: return self._data.get("builds", {})
 
@@ -286,13 +313,13 @@ def load_data(data_path: str,
             raise DataError(msg, code="version", detail={"actual": ver, "expected": expected_version})
         warnings.append("Version {} != expected {}".format(ver, expected_version))
     for bid, bd in raw.get("backgrounds", {}).items():
-        for f in REQUIRED_BG_FIELDS:
-            if f not in bd:
-                warnings.append("bg {} missing {}".format(bid, f))
+        for field_name in REQUIRED_BG_FIELDS:
+            if field_name not in bd:
+                warnings.append("bg {} missing {}".format(bid, field_name))
     for tid, td in raw.get("traits", {}).items():
-        for f in REQUIRED_TRAIT_FIELDS:
-            if f not in td:
-                warnings.append("trait {} missing {}".format(tid, f))
+        for field_name in REQUIRED_TRAIT_FIELDS:
+            if field_name not in td:
+                warnings.append("trait {} missing {}".format(tid, field_name))
     gids: set[str] = set(raw.get("groups", {}).keys())
     refs: set[str] = set()
     for bd in raw.get("backgrounds", {}).values():

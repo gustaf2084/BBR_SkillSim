@@ -34,6 +34,7 @@ a = Analysis(
         'tab_builds',
         'tab_about',
         'main_window',
+        'app_paths',
         'icon_provider',
         'data_loader',
         'engine',
@@ -96,7 +97,8 @@ exe = EXE(
     name='BBR_SkillSimulator',
     debug=False,
     bootloader_ignore_signals=False,
-    strip=True,
+    # Windows PE/Qt DLL 不使用 GNU strip；开启只会产生大量找不到 strip.exe 的警告。
+    strip=False,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,

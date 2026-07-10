@@ -10,7 +10,6 @@ from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -42,7 +41,7 @@ from ui_components import CollapsibleSection, make_placeholder
 class ReverseDeriveWorker(QThread):
     """Worker thread for reverse_derive to prevent UI freezing."""
     progress = Signal(int, int)    # current, total
-    finished = Signal(object)      # result dict
+    result_ready = Signal(object)  # result dict；保留 QThread.finished 原生信号
     cancelled = Signal()           # user cancellation
     error = Signal(str)            # error message
 
@@ -76,13 +75,14 @@ class ReverseDeriveWorker(QThread):
                 top_n=self.top_n,
                 tiebreak_limit=20,
                 progress_callback=on_progress,
+                cancel_callback=self.isInterruptionRequested,
                 use_attribute=self.use_attribute,
                 use_projected=self.use_projected,
             )
             if result.get("cancelled"):
                 self.cancelled.emit()
             else:
-                self.finished.emit(result)
+                self.result_ready.emit(result)
         except Exception as e:
             self.error.emit(str(e))
 
@@ -147,12 +147,6 @@ class ReverseTab(QWidget):
         self.topn_spin.setValue(15)
         self._topn_label = QLabel(t("reverse.topn_label"))
         adv_form.addRow(self._topn_label, self.topn_spin)
-
-        self.mode_combo = QComboBox()
-        self.mode_combo.addItem(t("mode.analytic"), "analytic")
-        self.mode_combo.addItem(t("mode.monte_slow"), "monte_carlo")
-        self._rev_mode_label = QLabel(t("common.mode_label"))
-        adv_form.addRow(self._rev_mode_label, self.mode_combo)
 
         lv.addWidget(self._adv_sec)
 
@@ -270,9 +264,6 @@ class ReverseTab(QWidget):
         self._adv_sec.set_title(t("reverse.advanced"))
         self.multi_trait_check.setText(t("reverse.multi_trait"))
         self._topn_label.setText(t("reverse.topn_label"))
-        self._rev_mode_label.setText(t("common.mode_label"))
-        self.mode_combo.setItemText(0, t("mode.analytic"))
-        self.mode_combo.setItemText(1, t("mode.monte_slow"))
         self.derive_btn.setText(t("reverse.derive_btn"))
         self.cancel_btn.setText(t("common.cancel"))
         self.target_search.setPlaceholderText(t("reverse.search_ph"))
@@ -391,7 +382,7 @@ class ReverseTab(QWidget):
 
         multi_trait = self.multi_trait_check.isChecked()
         top_n = self.topn_spin.value()
-        mode = self.mode_combo.currentData()
+        mode = "analytic"
 
         # show progress UI, disable derive button
         self.derive_btn.setEnabled(False)
@@ -402,13 +393,15 @@ class ReverseTab(QWidget):
         self.cancel_btn.setVisible(True)
 
         # start worker thread
-        self._worker = ReverseDeriveWorker(
+        worker = ReverseDeriveWorker(
             self.engine, targets, mode, multi_trait, top_n)
-        self._worker.progress.connect(self._on_worker_progress)
-        self._worker.finished.connect(self._on_worker_finished)
-        self._worker.cancelled.connect(self._on_worker_cancelled)
-        self._worker.error.connect(self._on_worker_error)
-        self._worker.start()
+        self._worker = worker
+        worker.progress.connect(self._on_worker_progress)
+        worker.result_ready.connect(self._on_worker_finished)
+        worker.cancelled.connect(self._on_worker_cancelled)
+        worker.error.connect(self._on_worker_error)
+        worker.finished.connect(lambda: self._on_worker_thread_finished(worker))
+        worker.start()
 
     def _on_worker_progress(self, current, total):
         if total > 0:
@@ -428,6 +421,11 @@ class ReverseTab(QWidget):
                              t("reverse.err_prefix") + err_msg)
         self._finish_derive(None)
 
+    def _on_worker_thread_finished(self, worker):
+        worker.deleteLater()
+        if self._worker is worker:
+            self._worker = None
+
     def _on_cancel(self):
         if self._worker and self._worker.isRunning():
             self.cancel_btn.setEnabled(False)
@@ -435,7 +433,6 @@ class ReverseTab(QWidget):
 
     def _finish_derive(self, rd):
         """Common cleanup after derive (threaded or direct)."""
-        self._worker = None
         self.derive_btn.setEnabled(True)
         self.cancel_btn.setEnabled(True)
         self.progress_bar.setVisible(False)
