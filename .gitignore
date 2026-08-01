@@ -47,5 +47,8 @@ tools/
 AGENTS.md
 
 # Dev reference material (kept local, not distributed)
-src/docs/汉化参考/
+# 注意:汉化参考/perk_groups/ 是 tests/test_perk_i18n.py 的源数据依赖,必须入库
+src/docs/汉化参考/backgrounds/
+src/docs/汉化参考/*.po
+src/docs/汉化参考/strings.nut
 src/docs/*.xlsx
