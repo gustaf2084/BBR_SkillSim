@@ -74,3 +74,25 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 4: 仓库清理修复:perk_groups 测试依赖恢复
+
+**Date**: 2026-08-01
+**Task**: 仓库清理修复:perk_groups 测试依赖恢复
+**Branch**: `main`
+
+### Summary
+
+清理提交触发 CI 失败:test_perk_i18n 依赖 src/docs/汉化参考/perk_groups/*.nut 源数据;恢复 48 个 perk_groups 入库,gitignore 改为仅排除 backgrounds/.po/strings.nut 与 xlsx;CI 全绿
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `af2fa33` | (see git log) |
+| `1c94150` | (see git log) |
+
+### Status
+
+[OK] **Completed**
