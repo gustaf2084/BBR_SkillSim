@@ -1,5 +1,9 @@
 # BBR_SkillSim — 战场兄弟重铸技能树概率模拟器
 
+![CI](https://github.com/gustaf2084/BBR_SkillSim/actions/workflows/test.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/gustaf2084/BBR_SkillSim)
+![License](https://img.shields.io/github/license/gustaf2084/BBR_SkillSim)
+
 Battle Brothers Reforged 模组的角色 build 概率分析工具。输入背景和特性，正向推演各技能树组出现概率，或反向推导达到指定技能树组的最佳组合。
 
 ## 功能
@@ -12,15 +16,25 @@ Battle Brothers Reforged 模组的角色 build 概率分析工具。输入背景
 - **导出功能** — 复制结果文本或导出 CSV 文件
 - **深色主题** — 导航栏底部一键切换深/浅主题，设置自动保存
 
+## 界面预览
+
+| 正向模拟（浅色） | 反向推导（浅色） | 流派推荐 |
+|---|---|---|
+| ![正向模拟](_ui_shots/02_forward_result.png) | ![反向推导](_ui_shots/04_reverse_result.png) | ![流派推荐](_ui_shots/05_builds.png) |
+
+| 正向模拟（深色） | 反向推导（深色） | 关于页 |
+|---|---|---|
+| ![正向模拟深色](_ui_shots/11_forward_result_dark.png) | ![反向推导深色](_ui_shots/12_reverse_result_dark.png) | ![关于页](_ui_shots/06_about.png) |
+
 ## 快速开始
 
 ### Windows 用户（推荐）
 
-下载 Release 中的 `BBR_SkillSimulator-vX.X.X.exe`，放到任意目录运行即可。
+下载 Release 中的 `BBR_SkillSimulator-vX.X.X.zip`，解压后运行其中的 `BBR_SkillSimulator.exe` 即可。
 
 **首次运行提示：**
 1. exe 启动时会解压临时文件，可能需要 5-10 秒
-2. 同级目录下需要 `data.json`、`perk_trees.json`、`perk_i18n.json` 和 `icons/` 文件夹（Release 包已包含）
+2. 同级目录下需要 `data.json`、`perk_trees.json`、`perk_i18n.json` 和 `icons/` 文件夹（zip 包已包含）
 3. **用户自定义数据：** 将自定义的 `data.json` 放在 exe 同级目录会优先加载
 
 ### 开发者运行
@@ -192,10 +206,16 @@ python -m mypy src
 - CI 构建时从 git tag 自动注入版本号（v0.1.0 → VERSION=0.1.0）
 - 手动构建时从 VERSION 文件读取
 
+### 发布新版本（全自动）
+
+1. 更新根 `VERSION` 文件并提交（提交后自动推送）
+2. 打标签并推送：`git tag v0.5.0 && git push origin v0.5.0`
+3. `build.yml` 自动完成：构建 exe → 打包 zip → **创建 GitHub Release 并上传资产**，无需手动上传
+
 ## 数据来源
 
 当前权重与技能树数据基于 Battle Brothers Reforged 0.9.1 源码解析生成；0.9.1 未提供的基础概率矩阵沿用 0.7.6 表格基线。技能/背景图标来自原版 BB Wiki 和 Reforged 模组资源。
 
 ## License
 
-仅供个人学习和模组研究使用。
+本项目采用 [GNU General Public License v3.0](LICENSE)，仅供个人学习和模组研究使用。
