@@ -53,3 +53,24 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 3: 仓库清理:移除参考资料与临时文件
+
+**Date**: 2026-08-01
+**Task**: 仓库清理:移除参考资料与临时文件
+**Branch**: `main`
+
+### Summary
+
+汉化参考(56 文件)+ 2 个 xlsx 转本地保留(git rm --cached + gitignore);删除 _crop_purity.png 与 screenshot_ui.py;.agents/、AGENTS.md 加入 gitignore;仓库 498→约 434 文件
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `af2fa33` | (see git log) |
+
+### Status
+
+[OK] **Completed**
