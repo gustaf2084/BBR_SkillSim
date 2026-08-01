@@ -27,3 +27,29 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 2: 项目全自动化与 GitHub 仓库整理
+
+**Date**: 2026-08-01
+**Task**: 项目全自动化与 GitHub 仓库整理
+**Branch**: `main`
+
+### Summary
+
+①post-commit 自动推送 hook(rebase/非 main 跳过,实测通过);②build.yml 自动打包 zip + action-gh-release 自动发布;③CLAUDE.md 自动化工作流约定;④README 徽章/截图/发布流程/GPL-3.0;⑤CI 修复:ubuntu 缺 PySide6 系统库致 pytest 收集失败,apt 装库解决,action 升级,失败上传诊断;⑥开发文档 8.5 + v0.4.8 变更记录
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `61daf57` | (see git log) |
+| `49bcf46` | (see git log) |
+| `cc0d386` | (see git log) |
+| `f835014` | (see git log) |
+| `01ec3e7` | (see git log) |
+| `1e24860` | (see git log) |
+
+### Status
+
+[OK] **Completed**
