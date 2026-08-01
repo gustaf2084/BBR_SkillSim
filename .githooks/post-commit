@@ -1,0 +1,28 @@
+#!/bin/sh
+# post-commit: 提交成功后自动推送 origin main(全自动工作流的一部分)。
+# 启用方式(一次性,入库后的新 clone 也需执行一次):
+#   git config core.hooksPath .githooks
+#
+# 安全设计:
+#   - rebase 进行中不触发(rebase 会对每个提交触发 post-commit)
+#   - 非 main 分支不推(实验分支留本地)
+#   - push 失败只提示,不阻断提交(与"不 force-push"原则一致)
+#   - push 前自动 fetch + rebase?不 —— 保持简单:失败提示后手动处理
+
+set -e
+
+# rebase 进行中(逐 commit 触发)则跳过
+[ -d .git/rebase-merge ] && exit 0
+[ -d .git/rebase-apply ] && exit 0
+
+# 非 main 分支跳过
+branch=$(git symbolic-ref --short HEAD 2>/dev/null) || exit 0
+[ "$branch" = "main" ] || exit 0
+
+# 推送(quiet 只输出错误);失败仅提示
+if git push origin main 2>/dev/null; then
+    echo "[auto-push] 已推送到 origin/main"
+else
+    echo "[auto-push] 推送失败(远程可能有新提交)——请运行 git pull --rebase origin main 后手动 git push" >&2
+fi
+exit 0
