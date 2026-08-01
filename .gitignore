@@ -41,3 +41,11 @@ CLAUDE.md
 
 # Data migration tooling (one-time scripts, not runtime code)
 tools/
+
+# Trellis runtime (local only)
+.agents/
+AGENTS.md
+
+# Dev reference material (kept local, not distributed)
+src/docs/汉化参考/
+src/docs/*.xlsx
