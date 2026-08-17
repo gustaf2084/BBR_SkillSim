@@ -43,6 +43,8 @@ CLAUDE.md
 tools/
 
 # Trellis runtime (local only)
+.trellis/
+.githooks/
 .agents/
 AGENTS.md
 
