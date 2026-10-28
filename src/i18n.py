@@ -166,8 +166,11 @@ _add("reverse.dlg_h_group",   "技能树组",              "Skill Tree Group")
 _add("reverse.dlg_h_category","类别",                  "Category")
 _add("reverse.dlg_h_prob",    "出现概率",              "Probability")
 _add("reverse.search_ph",     "搜索组...",             "Search groups...")
-_add("reverse.hint_dblclick", "💡 双击结果行可查看该组合的完整概率分布",
-      "💡 Double-click a row to view the full probability distribution")
+_add("reverse.hint_dblclick", "💡 双击结果行查看完整概率分布,右键可在正向模拟中打开",
+      "💡 Double-click a row for the full distribution; right-click to open it in Forward Simulation")
+_add("reverse.open_in_forward", "在正向模拟中打开",     "Open in Forward Simulation")
+_add("reverse.bg_hidden",     "该背景在正向页列表中已隐藏,无法打开",
+      "This background is hidden in the Forward list and cannot be opened")
 _add("reverse.progress_bg",   "正在处理背景 {0}/{1}…",  "Processing background {0}/{1}...")
 _add("reverse.guide_title",   "从目标倒推最佳选人",     "Work backwards from your target")
 _add("reverse.guide_body",

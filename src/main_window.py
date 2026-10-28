@@ -317,6 +317,7 @@ class MainWindow(QMainWindow):
             for pg in [self.forward_tab, self.reverse_tab, self.builds_tab]:
                 if pg and hasattr(pg, "on_data_ready"):
                     pg.on_data_ready(self.gd, self.engine, self.icon_provider)
+            self.reverse_tab.open_in_forward.connect(self._open_in_forward)
             self._setup_shortcuts()
         except Exception:
             self.gd = None
@@ -376,7 +377,15 @@ class MainWindow(QMainWindow):
     def _on_nav(self, row):
         self.stack.setCurrentIndex(row)
 
+    def _open_in_forward(self, bg_id, trait_ids):
+        """逆向页结果 → 正向页:填入组合、计算并切页。"""
+        if self.forward_tab.load_config(bg_id, trait_ids):
+            self.nav.setCurrentRow(0)
+        else:
+            self.statusBar().showMessage(t("reverse.bg_hidden"), 3000)
+
     def _setup_shortcuts(self):
         for i in range(1, 5):
             sc = QShortcut(QKeySequence("Ctrl+" + str(i)), self)
-            sc.activated.connect(lambda idx=i-1: self._on_nav(idx))
+            # 走 nav 切页,左侧导航高亮随之同步
+            sc.activated.connect(lambda idx=i-1: self.nav.setCurrentRow(idx))

@@ -5,7 +5,7 @@ Reverse derivation page: select target skill tree groups (multi-select), find be
 background + trait combinations.
 """
 
-from PySide6.QtCore import QSize, Qt, QThread, Signal
+from PySide6.QtCore import QPoint, QSize, Qt, QThread, Signal
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
     QApplication,
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QProgressBar,
     QPushButton,
@@ -94,6 +95,9 @@ class ReverseDeriveWorker(QThread):
 
 class ReverseTab(QWidget):
     """Reverse derivation page."""
+
+    # (bg_id, trait_ids):请求在正向页打开该组合,由 MainWindow 连接
+    open_in_forward = Signal(str, list)
 
     def __init__(self):
         super().__init__()
@@ -225,6 +229,8 @@ class ReverseTab(QWidget):
         self.result_table.setAlternatingRowColors(True)
         self.result_table.setVisible(False)
         self.result_table.itemDoubleClicked.connect(self._on_row_double_clicked)
+        self.result_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.result_table.customContextMenuRequested.connect(self._on_table_context_menu)
         rv.addWidget(self.result_table, 1)
 
         # Export button row
@@ -545,18 +551,35 @@ class ReverseTab(QWidget):
             self.result_table.setRowHeight(row, 36)
         self.result_table.setSortingEnabled(True)
 
-    def _on_row_double_clicked(self, item):
-        """Double-click row → popup showing forward simulation detail distribution."""
-        row = item.row()
+    def _row_config(self, row):
+        """返回该行的 (bg_id, trait_ids);行无效时返回 None。"""
         bg_item = self.result_table.item(row, 0)
         trait_item = self.result_table.item(row, 1)
         if not bg_item or not trait_item:
-            return
-
+            return None
         bg_id = bg_item.data(Qt.UserRole)
         if not bg_id:
+            return None
+        return bg_id, list(trait_item.data(Qt.UserRole) or [])
+
+    def _on_table_context_menu(self, pos: QPoint):
+        item = self.result_table.itemAt(pos)
+        if item is None:
             return
-        trait_ids = trait_item.data(Qt.UserRole) or []
+        cfg = self._row_config(item.row())
+        if cfg is None:
+            return
+        menu = QMenu(self)
+        act = menu.addAction(t("reverse.open_in_forward"))
+        act.triggered.connect(lambda: self.open_in_forward.emit(cfg[0], cfg[1]))
+        menu.exec(self.result_table.viewport().mapToGlobal(pos))
+
+    def _on_row_double_clicked(self, item):
+        """Double-click row → popup showing forward simulation detail distribution."""
+        cfg = self._row_config(item.row())
+        if cfg is None:
+            return
+        bg_id, trait_ids = cfg
 
         try:
             res = self.engine.forward_simulate(bg_id, trait_ids, mode="analytic")
@@ -606,6 +629,13 @@ class ReverseTab(QWidget):
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok)
         btns.accepted.connect(dlg.accept)
+        open_btn = btns.addButton(t("reverse.open_in_forward"), QDialogButtonBox.ActionRole)
+        open_btn.setObjectName("secondary_btn")
+
+        def _open():
+            dlg.accept()
+            self.open_in_forward.emit(bg_id, list(trait_ids))
+        open_btn.clicked.connect(_open)
         dlv.addWidget(btns)
 
         dlg.exec()

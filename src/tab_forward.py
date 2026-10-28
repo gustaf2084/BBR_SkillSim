@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 import theme
+from data_loader import DUPLICATE_BG_GROUPS
 from i18n import cat_name, prob_tier_label, t
 from skill_tree_widget import SkillTreeWidget, build_skill_tree_data
 from ui_components import (
@@ -553,6 +554,36 @@ class ForwardTab(QWidget):
                 combo.setCurrentIndex(0)
         finally:
             self._gathering_stars = False
+
+    # ---- external entry ----
+
+    def load_config(self, bg_id, trait_ids):
+        """填入指定背景与特质并立即计算(供逆向页"在正向模拟中打开"调用)。
+
+        重复背景映射到列表中的代表项;其他被 UI 隐藏的背景返回 False。
+        """
+        if self.gd is None:
+            return False
+        idx = self.bg_combo.findData(bg_id)
+        if idx < 0:
+            for group in DUPLICATE_BG_GROUPS:
+                if bg_id in group:
+                    idx = self.bg_combo.findData(group[0])
+                    break
+        if idx < 0:
+            return False
+        wanted = set(trait_ids or [])
+        self._suspend_live = True
+        try:
+            self.trait_search.clear()
+            self.bg_combo.setCurrentIndex(idx)
+            for cb in self._trait_checkboxes:
+                cb.setChecked(cb.property("trait_id") in wanted)
+            self._on_trait_toggle(False)
+        finally:
+            self._suspend_live = False
+        self._on_calculate(show_busy=False)
+        return True
 
     # ---- calculate ----
 
