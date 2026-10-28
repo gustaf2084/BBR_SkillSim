@@ -135,6 +135,7 @@ _add("reverse.result_title_ph","选择目标技能树组，点击推导",
 _add("reverse.h_bg",         "背景",                   "Background")
 _add("reverse.h_traits",     "特性",                   "Traits")
 _add("reverse.h_score",      "概率/得分",              "Prob/Score")
+_add("reverse.h_bar",        "平均概率",               "Avg. Prob")
 _add("reverse.h_purity",     "次要组干扰",             "Side-group Noise")
 _add("reverse.empty_title",  "无可用组合",              "No valid combination")
 _add("reverse.empty_body",   "该目标组无任何背景+特性组合可生成。",

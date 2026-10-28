@@ -35,7 +35,12 @@ from PySide6.QtWidgets import (
 import theme
 from engine import SkillEngine
 from i18n import cat_name, prob_tier_metal, t
-from ui_components import CollapsibleSection, make_placeholder
+from ui_components import (
+    CollapsibleSection,
+    NumericItem,
+    ProbBarDelegate,
+    make_placeholder,
+)
 
 
 class ReverseDeriveWorker(QThread):
@@ -200,16 +205,21 @@ class ReverseTab(QWidget):
         self._dblclick_hint.setVisible(False)
         rv.addWidget(self._dblclick_hint)
 
-        self.result_table = QTableWidget(0, 4)
-        self._reverse_headers = [
-            t("reverse.h_bg"), t("reverse.h_traits"),
-            t("reverse.h_score"), t("reverse.h_purity"),
-        ]
+        self.result_table = QTableWidget(0, 5)
+        self._reverse_headers = self._header_labels()
         self.result_table.setHorizontalHeaderLabels(self._reverse_headers)
-        self.result_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.result_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.result_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        self.result_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header = self.result_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.Fixed)
+        header.resizeSection(3, 140)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        self.result_table.setItemDelegateForColumn(3, ProbBarDelegate(self.result_table))
+        # 表头点击排序;初始无排序指示,保持引擎输出顺序(得分降序、纯度升序)
+        header.setSortIndicatorClearable(True)
+        header.setSortIndicator(-1, Qt.AscendingOrder)
+        self.result_table.setSortingEnabled(True)
         self.result_table.verticalHeader().setVisible(False)
         self.result_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.result_table.setAlternatingRowColors(True)
@@ -281,10 +291,7 @@ class ReverseTab(QWidget):
         else:
             self._refresh_result_title()
         # table headers
-        self._reverse_headers = [
-            t("reverse.h_bg"), t("reverse.h_traits"),
-            t("reverse.h_score"), t("reverse.h_purity"),
-        ]
+        self._reverse_headers = self._header_labels()
         self.result_table.setHorizontalHeaderLabels(self._reverse_headers)
         # category panel titles
         for cat, panel in self._cat_panels.items():
@@ -295,6 +302,13 @@ class ReverseTab(QWidget):
         if self._last_results is not None and self._last_results.get("results"):
             self._fill_table(self._last_results["results"], len(
                 [cb for cbs in self._cat_checkboxes.values() for cb, _ in cbs if cb.isChecked()]) > 1)
+
+    @staticmethod
+    def _header_labels():
+        return [
+            t("reverse.h_bg"), t("reverse.h_traits"),
+            t("reverse.h_score"), t("reverse.h_bar"), t("reverse.h_purity"),
+        ]
 
     def retheme(self):
         """主题切换后重刷表格内代码设置的颜色。"""
@@ -477,6 +491,8 @@ class ReverseTab(QWidget):
         self._fill_table(rd["results"], multi)
 
     def _fill_table(self, results, multi):
+        # 填表期间关闭排序,否则每 setItem 一次就重排,行号错位
+        self.result_table.setSortingEnabled(False)
         self.result_table.setRowCount(len(results))
         data_font = QFont("Consolas", 11)
         data_font.setStyleHint(QFont.Monospace)
@@ -503,13 +519,20 @@ class ReverseTab(QWidget):
             else:
                 g = list(probs.keys())[0]
                 prob_str = f"{probs[g]*100:.1f}%"
-            prob_item = QTableWidgetItem(prob_str)
+            prob_item = NumericItem(prob_str, score)
             prob_item.setFont(data_font)
             prob_item.setTextAlignment(Qt.AlignCenter)
             self.result_table.setItem(row, 2, prob_item)
 
+            # bar col:单目标为该组概率,多目标为平均概率(score / 目标数)
+            avg = score / max(1, len(probs))
+            bar_item = NumericItem("", avg)
+            bar_item.setData(Qt.UserRole, float(avg))
+            bar_item.setToolTip(f"{avg*100:.1f}%")
+            self.result_table.setItem(row, 3, bar_item)
+
             # purity col (with color coding)
-            purity_item = QTableWidgetItem(f"{purity:.2f}")
+            purity_item = NumericItem(f"{purity:.2f}", purity)
             purity_item.setTextAlignment(Qt.AlignCenter)
             if purity <= 0.5:
                 purity_item.setBackground(QBrush(QColor(theme.c("purity_good_bg"))))
@@ -517,9 +540,10 @@ class ReverseTab(QWidget):
             elif purity > 2.0:
                 purity_item.setBackground(QBrush(QColor(theme.c("purity_bad_bg"))))
                 purity_item.setToolTip(t("reverse.purity_high_tip"))
-            self.result_table.setItem(row, 3, purity_item)
+            self.result_table.setItem(row, 4, purity_item)
 
             self.result_table.setRowHeight(row, 36)
+        self.result_table.setSortingEnabled(True)
 
     def _on_row_double_clicked(self, item):
         """Double-click row → popup showing forward simulation detail distribution."""
@@ -618,7 +642,7 @@ class ReverseTab(QWidget):
             bg_item = self.result_table.item(row, 0)
             trait_item = self.result_table.item(row, 1)
             score_item = self.result_table.item(row, 2)
-            purity_item = self.result_table.item(row, 3)
+            purity_item = self.result_table.item(row, 4)
             if not bg_item or not trait_item:
                 continue
             bg_id = bg_item.data(Qt.UserRole) or ""

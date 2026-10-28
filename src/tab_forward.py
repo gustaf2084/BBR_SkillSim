@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """tab_forward.py - forward simulation page."""
 
-from PySide6.QtCore import QRectF, QStringListModel, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
+from PySide6.QtCore import QStringListModel, Qt
+from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -22,9 +22,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSplitter,
-    QStyle,
-    QStyledItemDelegate,
-    QStyleOptionViewItem,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -34,7 +31,12 @@ from PySide6.QtWidgets import (
 import theme
 from i18n import cat_name, prob_tier_label, t
 from skill_tree_widget import SkillTreeWidget, build_skill_tree_data
-from ui_components import CollapsibleSection, make_placeholder
+from ui_components import (
+    CollapsibleSection,
+    NumericItem,
+    ProbBarDelegate,
+    make_placeholder,
+)
 
 # v0.3.0: Attribute key mapping for i18n
 _ATTR_I18N = {
@@ -55,48 +57,6 @@ _ATTR_ORDER = [
 ]
 
 _STAR_EXPECTED = "__expected__"
-
-
-class ProbBarDelegate(QStyledItemDelegate):
-    """自绘概率条:扁平圆角实色填充,颜色随概率分层、随主题切换。
-
-    数据约定:index.data(Qt.UserRole) = 概率浮点值(0~1)。
-    """
-
-    BAR_HEIGHT = 14
-    H_PAD = 8
-
-    def paint(self, painter, option, index):
-        # 先画默认背景(选中态/交替行色)
-        opt = QStyleOptionViewItem(option)
-        self.initStyleOption(opt, index)
-        opt.text = ""
-        style = opt.widget.style() if opt.widget else QApplication.style()
-        style.drawControl(QStyle.CE_ItemViewItem, opt, painter, opt.widget)
-
-        p = index.data(Qt.UserRole)
-        if p is None:
-            return
-        p = max(0.0, min(1.0, float(p)))
-
-        painter.save()
-        painter.setRenderHint(QPainter.Antialiasing)
-        rect = option.rect
-        y = rect.y() + (rect.height() - self.BAR_HEIGHT) / 2
-        track = QRectF(rect.x() + self.H_PAD, y,
-                       rect.width() - self.H_PAD * 2, self.BAR_HEIGHT)
-        # 轨道
-        painter.setPen(QPen(QColor(theme.c("bar_border")), 1))
-        painter.setBrush(QColor(theme.c("bar_track")))
-        painter.drawRoundedRect(track, 3, 3)
-        # 填充
-        fill_w = (track.width() - 2) * p
-        if fill_w >= 1:
-            fill = QRectF(track.x() + 1, track.y() + 1, fill_w, track.height() - 2)
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(QColor(theme.prob_color(p)))
-            painter.drawRoundedRect(fill, 2, 2)
-        painter.restore()
 
 
 class ForwardTab(QWidget):
@@ -308,6 +268,10 @@ class ForwardTab(QWidget):
         self.result_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.result_table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.result_table.setItemDelegateForColumn(4, ProbBarDelegate(self.result_table))
+        # 表头点击排序;初始无排序指示,保持引擎输出顺序
+        self.result_table.horizontalHeader().setSortIndicatorClearable(True)
+        self.result_table.horizontalHeader().setSortIndicator(-1, Qt.AscendingOrder)
+        self.result_table.setSortingEnabled(True)
         self.result_table.itemClicked.connect(self._on_table_click)
         tv.addWidget(self.result_table)
 
@@ -636,6 +600,8 @@ class ForwardTab(QWidget):
         self._fill_skill_tree(res)
 
     def _fill_table(self, results):
+        # 填表期间关闭排序,否则每 setItem 一次就重排,行号错位
+        self.result_table.setSortingEnabled(False)
         self.result_table.setRowCount(len(results))
         df = QFont("Consolas", 11)
         df.setStyleHint(QFont.Monospace)
@@ -655,7 +621,8 @@ class ForwardTab(QWidget):
             cat = self.gd.group_category(group) or ""
             cz = cat_name(cat) if cat else cat
             bgc = theme.CAT_COLOR.get(cat, theme.CAT_COLOR["Always"])
-            ci = QTableWidgetItem(" " + cz + " ")
+            cat_rank = theme.CAT_ORDER.index(cat) if cat in theme.CAT_ORDER else len(theme.CAT_ORDER)
+            ci = NumericItem(" " + cz + " ", cat_rank)
             ci.setTextAlignment(Qt.AlignCenter)
             ci.setBackground(QBrush(QColor(bgc)))
             ci.setForeground(QBrush(QColor(theme.c("badge_text"))))
@@ -663,16 +630,17 @@ class ForwardTab(QWidget):
             self.result_table.setItem(row, 2, ci)
             # prob
             lbl, color = prob_tier_label(p)
-            pi = QTableWidgetItem(f"{p*100:.1f}% ({lbl})")
+            pi = NumericItem(f"{p*100:.1f}% ({lbl})", p)
             pi.setFont(df)
             pi.setForeground(QBrush(QColor(color)))
             pi.setTextAlignment(Qt.AlignCenter)
             self.result_table.setItem(row, 3, pi)
             # bar (delegate 自绘,概率存 UserRole)
-            bi = QTableWidgetItem()
+            bi = NumericItem("", p)
             bi.setData(Qt.UserRole, float(p))
             self.result_table.setItem(row, 4, bi)
             self.result_table.setRowHeight(row, 38)
+        self.result_table.setSortingEnabled(True)
 
     def _fill_skill_tree(self, results):
         trees = build_skill_tree_data(self.gd, results)
