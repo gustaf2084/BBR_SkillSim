@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """tab_forward.py - forward simulation page."""
 
-from PySide6.QtCore import QStringListModel, Qt
+from PySide6.QtCore import QStringListModel, Qt, QTimer
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -62,6 +62,7 @@ _STAR_EXPECTED = "__expected__"
 class ForwardTab(QWidget):
     TRAIT_COLS = 4
     TRAIT_MAX = 3
+    LIVE_DEBOUNCE_MS = 200
 
     def __init__(self):
         super().__init__()
@@ -77,6 +78,13 @@ class ForwardTab(QWidget):
         self._gathering_stars = False  # v0.3.0: guard for programmatic star changes
         self._attr_est_label = None
         self._attr_miss_label = None
+        # 实时计算:输入变化后防抖重算(仅解析模式)
+        self._suspend_live = False   # 批量改控件期间挂起
+        self._calculating = False    # 重入保护(按钮路径会 processEvents)
+        self._recalc_timer = QTimer(self)
+        self._recalc_timer.setSingleShot(True)
+        self._recalc_timer.setInterval(self.LIVE_DEBOUNCE_MS)
+        self._recalc_timer.timeout.connect(lambda: self._on_calculate(show_busy=False))
         self._build_ui()
 
     def _build_ui(self):
@@ -145,6 +153,7 @@ class ForwardTab(QWidget):
         self.attr_check.toggled.connect(self._on_attr_toggled)  # v0.3.0
         self.proj_check = QCheckBox(t("forward.use_proj"))
         self.proj_check.setChecked(True)
+        self.proj_check.toggled.connect(self._schedule_recalc)
         af.addRow(self.attr_check)
         af.addRow(self.proj_check)
 
@@ -172,6 +181,7 @@ class ForwardTab(QWidget):
         self.mode_combo = QComboBox()
         self.mode_combo.addItem(t("mode.analytic"), "analytic")
         self.mode_combo.addItem(t("mode.monte"), "monte_carlo")
+        self.mode_combo.currentIndexChanged.connect(self._schedule_recalc)
         self._mode_label = QLabel(t("common.mode_label"))
         af.addRow(self._mode_label, self.mode_combo)
         lv.addWidget(self._adv_sec)
@@ -302,6 +312,14 @@ class ForwardTab(QWidget):
     # ---- data ready ----
 
     def on_data_ready(self, gd, engine, icon_provider):
+        self._suspend_live = True
+        try:
+            self._apply_data(gd, engine, icon_provider)
+        finally:
+            self._suspend_live = False
+        self._schedule_recalc()
+
+    def _apply_data(self, gd, engine, icon_provider):
         prev_bg_id = self.bg_combo.currentData()
         prev_traits = {cb.property("trait_id") for cb in self._trait_checkboxes if cb.isChecked()}
 
@@ -444,6 +462,7 @@ class ForwardTab(QWidget):
             if not cb.isChecked():
                 cb.setEnabled(not at_limit)
         self._update_trait_counter()
+        self._schedule_recalc()
 
     # ---- v0.3.0: Attribute range panel ----
 
@@ -453,6 +472,7 @@ class ForwardTab(QWidget):
         if bg_id and self.gd is not None:
             self._sync_stars_from_engine(bg_id)
             self._refresh_attr_panel(bg_id)
+            self._schedule_recalc()
 
     def _refresh_attr_panel(self, bg_id: str | None):
         """Update the attribute range panel for the given background."""
@@ -498,14 +518,13 @@ class ForwardTab(QWidget):
         """Disable star controls when attribute weighting is off."""
         for combo in self._star_combos.values():
             combo.setEnabled(checked)
+        self._schedule_recalc()
 
     def _on_star_changed(self, _index):
         """Called when any star QComboBox changes. Auto-recalculate."""
         if self._gathering_stars:
             return
-        # Auto-recalculate if we have results already
-        if self._last_results is not None:
-            self._on_calculate()
+        self._schedule_recalc()
 
     def _gather_talent_stars(self, bg_id: str | None = None) -> dict[str, float] | None:
         """Collect current star values from UI combos."""
@@ -537,9 +556,18 @@ class ForwardTab(QWidget):
 
     # ---- calculate ----
 
-    def _on_calculate(self):
-        if self.gd is None or self.engine is None:
+    def _schedule_recalc(self, *_args):
+        """输入变化后防抖重算;蒙特卡洛模式较慢,仍需手动点击计算。"""
+        if self._suspend_live or self.gd is None or self.engine is None:
             return
+        if self.mode_combo.currentData() != "analytic":
+            return
+        self._recalc_timer.start()
+
+    def _on_calculate(self, *, show_busy=True):
+        if self.gd is None or self.engine is None or self._calculating:
+            return
+        self._recalc_timer.stop()
         bg_id = self.bg_combo.currentData()
         if not bg_id:
             return
@@ -554,10 +582,12 @@ class ForwardTab(QWidget):
         # v0.3.0: Refresh attribute panel
         self._refresh_attr_panel(bg_id)
 
-        # busy state (计算为同步调用,给出即时按下反馈)
-        self.calc_btn.setEnabled(False)
-        self.calc_btn.setText(t("common.calculating"))
-        QApplication.processEvents()
+        # busy state (计算为同步调用,按钮触发时给出即时按下反馈;实时计算不闪烁按钮)
+        self._calculating = True
+        if show_busy:
+            self.calc_btn.setEnabled(False)
+            self.calc_btn.setText(t("common.calculating"))
+            QApplication.processEvents()
         try:
             if mode == "monte_carlo":
                 res = self.engine.forward_simulate(
@@ -574,6 +604,7 @@ class ForwardTab(QWidget):
                                  t("forward.calc_err_prefix") + str(e))
             return
         finally:
+            self._calculating = False
             self.calc_btn.setEnabled(True)
             self.calc_btn.setText(t("forward.calc_btn"))
 
