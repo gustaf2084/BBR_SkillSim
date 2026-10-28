@@ -49,7 +49,8 @@ jobs:
           New-Item -ItemType Directory -Force release | Out-Null
           Copy-Item src/dist/BBR_SkillSimulator.exe release/BBR_SkillSimulator.exe
           Copy-Item src/data.json, src/perk_trees.json, src/perk_i18n.json, VERSION release/
-          Copy-Item -Recurse src/builds release/
+          # src/builds 为用户自定义流派目录,已被 .gitignore 排除;存在时才打包
+          if (Test-Path src/builds) { Copy-Item -Recurse src/builds release/ }
           Copy-Item -Recurse src/icons release/
           Compress-Archive -Path release/* -DestinationPath "release/BBR_SkillSimulator-v$ver.zip"
 
