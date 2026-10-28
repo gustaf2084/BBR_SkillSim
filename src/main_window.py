@@ -203,7 +203,7 @@ class MainWindow(QMainWindow):
 
     def _update_nav_labels(self):
         for i in range(min(len(NAV_KEYS), self.nav.count())):
-            self.nav.item(i).setText(f"     {t(NAV_KEYS[i])}")
+            self.nav.item(i).setText(t(NAV_KEYS[i]))
         self.nav_title.setText(t("nav.title"))
 
     def _update_foot_buttons(self):
@@ -217,12 +217,12 @@ class MainWindow(QMainWindow):
             self.lang_btn.setIcon(ip.get_lang_icon(nav_color, 16))
         # 主题按钮
         if theme.is_dark():
-            self.theme_btn.setText(" ☀ " + t("theme.to_light"))
+            self.theme_btn.setText(" " + t("theme.to_light"))
             self.theme_btn.setToolTip(t("theme.tip_light"))
             if ip is not None:
                 self.theme_btn.setIcon(ip.get_theme_icon(True, nav_color, 16))
         else:
-            self.theme_btn.setText(" 🌙 " + t("theme.to_dark"))
+            self.theme_btn.setText(" " + t("theme.to_dark"))
             self.theme_btn.setToolTip(t("theme.tip_dark"))
             if ip is not None:
                 self.theme_btn.setIcon(ip.get_theme_icon(False, nav_color, 16))
@@ -259,7 +259,7 @@ class MainWindow(QMainWindow):
         self.nav.setIconSize(QSize(22, 22))
         self.nav.setSpacing(1)
         for i, key in enumerate(NAV_KEYS):
-            item = QListWidgetItem(f"     {t(key)}")
+            item = QListWidgetItem(t(key))
             item.setData(Qt.UserRole, key)
             self.nav.addItem(item)
         self.nav.setCurrentRow(0)
@@ -328,18 +328,18 @@ class MainWindow(QMainWindow):
         lay = QVBoxLayout(w)
         lay.setAlignment(Qt.AlignCenter)
         tt = QLabel(t("error.data_load_title"))
-        tt.setStyleSheet(f"font-size:22px;font-weight:bold;color:{theme.c('error_border')};")
+        tt.setObjectName("error_page_title")
         tt.setAlignment(Qt.AlignCenter)
         lay.addWidget(tt)
         detail = self._data_error or t("error.data_load_no_details")
         m = QLabel(detail + "\n\n" + t("error.data_load_path").format(self.data_path))
         m.setWordWrap(True)
-        m.setStyleSheet("font-size:13px;padding:20px;font-family:Consolas,monospace;")
+        m.setObjectName("error_page_detail")
         m.setAlignment(Qt.AlignCenter)
         m.setMaximumWidth(750)
         lay.addWidget(m)
         hint = QLabel(t("error.data_load_hint"))
-        hint.setStyleSheet(f"font-size:13px;color:{theme.c('text_muted')};padding:10px;")
+        hint.setObjectName("error_page_hint")
         hint.setAlignment(Qt.AlignCenter)
         lay.addWidget(hint)
         b = QPushButton(t("error.retry"))

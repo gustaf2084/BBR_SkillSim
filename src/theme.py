@@ -86,6 +86,12 @@ LIGHT = {
     # 概率条轨道
     "bar_track":      "#F0EDE6",
     "bar_border":     "#DDD6CC",
+    # 实色底上的文字(类别徽章等,两套主题均为白字)
+    "badge_text":     "#FFFFFF",
+    # 技能节点缩写文字(按填充色亮度二选一)与悬停描边
+    "node_text_light": "#FFFFFF",
+    "node_text_dark":  "#1C1814",
+    "node_hover_ring": "#FFFFFF",
 }
 
 DARK = {
@@ -147,6 +153,10 @@ DARK = {
     "scroll_handle_hover": "#6B5C3D",
     "bar_track":      "#2C2517",
     "bar_border":     "#3D3528",
+    "badge_text":     "#FFFFFF",
+    "node_text_light": "#FFFFFF",
+    "node_text_dark":  "#1C1814",
+    "node_hover_ring": "#FFFFFF",
 }
 
 # ── 概率分层色(高→无,5 档)──────────────────────────────────
@@ -276,7 +286,7 @@ QMainWindow, QStackedWidget, QDialog {{
 }}
 
 #nav_list::item {{
-    padding: 12px 14px;
+    padding: 12px 14px 12px 32px;
     border-left: 3px solid transparent;
     border-bottom: none;
     color: {c("nav_text")};
@@ -830,6 +840,11 @@ QMenu::item:selected {{
     padding-top: 4px;
 }}
 
+#notice_error_title {{
+    font-size: 16px;
+    font-weight: bold;
+}}
+
 #notice_error {{
     background-color: {c("error_bg")};
     border: 2px solid {c("error_border")};
@@ -959,6 +974,35 @@ QMenu::item:selected {{
 #st_chip_close:hover {{
     background: {c("danger_soft_bg")};
     color: {c("error_border")};
+}}
+
+/* ── 错误页 / 对话框 / 计数标签 ── */
+#error_page_title {{
+    font-size: 22px;
+    font-weight: bold;
+    color: {c("error_border")};
+}}
+
+#error_page_detail {{
+    font-size: 13px;
+    padding: 20px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+}}
+
+#error_page_hint {{
+    font-size: 13px;
+    color: {c("text_muted")};
+    padding: 10px;
+}}
+
+#dialog_header {{
+    font-size: 14px;
+    font-weight: bold;
+    padding: 8px;
+}}
+
+#trait_counter {{
+    font-weight: bold;
 }}
 
 #st_legend {{

@@ -239,7 +239,8 @@ class SkillNode(QGraphicsEllipseItem):
             zh = get_perk_name_zh(self.skill_name)
             abbrev = zh[:2] if len(zh) >= 2 else (self.skill_name[:2].upper() if self.skill_name else "?")
             # 按填充色亮度决定文字颜色,保证两套主题下都可读
-            painter.setPen(QColor("#FFFFFF") if self._color.lightness() < 150 else QColor("#1C1814"))
+            painter.setPen(QColor(theme.c("node_text_light")) if self._color.lightness() < 150
+                           else QColor(theme.c("node_text_dark")))
             f = QFont("Microsoft YaHei", 8, QFont.Bold)
             painter.setFont(f)
             painter.drawText(QRectF(-NODE_RADIUS + 2, -NODE_RADIUS + 2,
@@ -279,7 +280,7 @@ class SkillNode(QGraphicsEllipseItem):
 
     def hoverEnterEvent(self, event):
         if self.skill_name:
-            self.setPen(QPen(QColor("#FFFFFF"), 2.5))
+            self.setPen(QPen(QColor(theme.c("node_hover_ring")), 2.5))
             self._show_tooltip(event.screenPos())
         super().hoverEnterEvent(event)
 

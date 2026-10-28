@@ -553,7 +553,7 @@ class ReverseTab(QWidget):
         info = QLabel(t("reverse.dlg_bg_label") + self.gd.bg_name(bg_id) + "\n"
                       + t("reverse.dlg_traits_label")
                       + (", ".join(self.gd.trait_name(t) for t in trait_ids) if trait_ids else t("common.no_traits")))
-        info.setStyleSheet("font-size: 14px; font-weight: bold; padding: 8px;")
+        info.setObjectName("dialog_header")
         dlv.addWidget(info)
 
         tbl = QTableWidget(0, 3)

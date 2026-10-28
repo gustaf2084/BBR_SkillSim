@@ -151,7 +151,7 @@ class ForwardTab(QWidget):
 
         # traits section (label with live n/3 counter)
         self._trait_label = QLabel(t("forward.traits_count").format(0))
-        self._trait_label.setStyleSheet("font-weight:bold;")
+        self._trait_label.setObjectName("trait_counter")
         bf.addRow(self._trait_label)
 
         # trait search filter
@@ -658,7 +658,7 @@ class ForwardTab(QWidget):
             ci = QTableWidgetItem(" " + cz + " ")
             ci.setTextAlignment(Qt.AlignCenter)
             ci.setBackground(QBrush(QColor(bgc)))
-            ci.setForeground(QBrush(QColor("#FFFFFF")))
+            ci.setForeground(QBrush(QColor(theme.c("badge_text"))))
             ci.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
             self.result_table.setItem(row, 2, ci)
             # prob

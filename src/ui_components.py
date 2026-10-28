@@ -74,7 +74,7 @@ def make_error_notice(title, body):
     v = QVBoxLayout(w)
 
     t = QLabel(title)
-    t.setStyleSheet("font-size: 16px; font-weight: bold;")
+    t.setObjectName("notice_error_title")
     t.setWordWrap(True)
     v.addWidget(t)
 
