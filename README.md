@@ -16,16 +16,6 @@ Battle Brothers Reforged 模组的角色 build 概率分析工具。输入背景
 - **导出功能** — 复制结果文本或导出 CSV 文件
 - **深色主题** — 导航栏底部一键切换深/浅主题，设置自动保存
 
-## 界面预览
-
-| 正向模拟（浅色） | 反向推导（浅色） | 流派推荐 |
-|---|---|---|
-| ![正向模拟](_ui_shots/02_forward_result.png) | ![反向推导](_ui_shots/04_reverse_result.png) | ![流派推荐](_ui_shots/05_builds.png) |
-
-| 正向模拟（深色） | 反向推导（深色） | 关于页 |
-|---|---|---|
-| ![正向模拟深色](_ui_shots/11_forward_result_dark.png) | ![反向推导深色](_ui_shots/12_reverse_result_dark.png) | ![关于页](_ui_shots/06_about.png) |
-
 ## 快速开始
 
 ### Windows 用户（推荐）
