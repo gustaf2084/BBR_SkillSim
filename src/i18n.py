@@ -52,6 +52,7 @@ _add("common.error",         "错误",               "Error")
 _add("common.mode_label",    "计算模式:",           "Mode:")
 _add("common.copied",        "已复制到剪贴板",       "Copied to clipboard")
 _add("common.cancel",        "取消",               "Cancel")
+_add("common.clear",         "清空",               "Clear all")
 _add("common.calculating",   "计算中…",             "Calculating...")
 
 # ── nav / window chrome ──

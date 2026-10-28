@@ -976,6 +976,33 @@ QMenu::item:selected {{
     color: {c("error_border")};
 }}
 
+/* ── 逆向页已选目标标签栏 ── */
+#target_chip {{
+    background: {c("accent_soft")};
+    border: 1px solid {c("border_strong")};
+    border-radius: 11px;
+    padding: 2px 10px;
+    font-size: 12px;
+    color: {c("text")};
+}}
+
+#target_chip:hover {{
+    background: {c("danger_soft_bg")};
+    border-color: {c("error_border")};
+}}
+
+#chip_clear {{
+    background: transparent;
+    border: none;
+    padding: 2px 6px;
+    font-size: 12px;
+    color: {c("text_muted")};
+    text-decoration: underline;
+    min-height: 0;
+}}
+
+#chip_clear:hover {{ color: {c("error_border")}; }}
+
 /* ── 错误页 / 对话框 / 计数标签 ── */
 #error_page_title {{
     font-size: 22px;

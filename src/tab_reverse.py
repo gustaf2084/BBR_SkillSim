@@ -37,6 +37,7 @@ import theme
 from engine import SkillEngine
 from i18n import cat_name, prob_tier_metal, t
 from ui_components import (
+    ChipBar,
     CollapsibleSection,
     NumericItem,
     ProbBarDelegate,
@@ -132,6 +133,12 @@ class ReverseTab(QWidget):
         self.target_search.setClearButtonEnabled(True)
         self.target_search.textChanged.connect(self._on_target_search)
         lv.addWidget(self.target_search)
+
+        # 已选目标标签栏(点 × 取消勾选,无选择时自动隐藏)
+        self.target_chips = ChipBar(clear_text=t("common.clear"))
+        self.target_chips.removed.connect(self._on_chip_removed)
+        self.target_chips.cleared.connect(self._on_chips_cleared)
+        lv.addWidget(self.target_chips)
 
         target_scroll = QScrollArea()
         target_scroll.setWidgetResizable(True)
@@ -285,6 +292,8 @@ class ReverseTab(QWidget):
         self.target_search.setPlaceholderText(t("reverse.search_ph"))
         self.copy_btn.setText(t("reverse.copy_btn"))
         self.export_btn.setText(t("reverse.export_btn"))
+        self.target_chips.set_clear_text(t("common.clear"))
+        self._refresh_chips()
         self._empty_title_lbl.setText(t("reverse.empty_title"))
         self._empty_body_lbl.setText(t("reverse.empty_body"))
         self._dblclick_hint.setText(t("reverse.hint_dblclick"))
@@ -336,6 +345,28 @@ class ReverseTab(QWidget):
             title = title[:77] + "..."
         self.result_title.setText(title)
 
+    def _refresh_chips(self):
+        if self.gd is None:
+            return
+        self.target_chips.set_items(
+            [(gid, self.gd.group_name(gid)) for gid in self._checked_targets()])
+
+    def _iter_checkboxes(self):
+        for cbs in self._cat_checkboxes.values():
+            yield from cbs
+
+    def _on_chip_removed(self, gid):
+        for cb, g in self._iter_checkboxes():
+            if g == gid:
+                cb.setChecked(False)  # toggled → _refresh_chips
+
+    def _on_chips_cleared(self):
+        for cb, _ in self._iter_checkboxes():
+            cb.blockSignals(True)
+            cb.setChecked(False)
+            cb.blockSignals(False)
+        self._refresh_chips()
+
     def _checked_targets(self):
         targets = []
         for cat, cbs in self._cat_checkboxes.items():
@@ -379,6 +410,7 @@ class ReverseTab(QWidget):
                     cb.setIcon(self.icon_provider.get_icon(g, "groups", 18))
                     cb.setIconSize(QSize(18, 18))
                 cb.setChecked(g in selected_targets)
+                cb.toggled.connect(self._refresh_chips)
                 cbs.append((cb, g))
                 row, col = divmod(i, 2)
                 grid.addWidget(cb, row, col)
