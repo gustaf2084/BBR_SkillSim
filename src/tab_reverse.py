@@ -6,7 +6,7 @@ background + trait combinations.
 """
 
 from PySide6.QtCore import QPoint, QSize, Qt, QThread, Signal
-from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtGui import QBrush, QColor, QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -222,7 +222,8 @@ class ReverseTab(QWidget):
         header = self.result_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Stretch)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        # 多目标分项文本可能很长:与前两列分摊宽度,超出省略,完整内容见 tooltip
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
         header.setSectionResizeMode(3, QHeaderView.Fixed)
         header.resizeSection(3, 140)
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
@@ -234,6 +235,7 @@ class ReverseTab(QWidget):
         self.result_table.verticalHeader().setVisible(False)
         self.result_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.result_table.setAlternatingRowColors(True)
+        self.result_table.setWordWrap(False)  # 长文本单行省略,不折行截断
         self.result_table.setVisible(False)
         self.result_table.itemDoubleClicked.connect(self._on_row_double_clicked)
         self.result_table.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -270,6 +272,26 @@ class ReverseTab(QWidget):
         splitter.addWidget(right)
         splitter.setSizes([340, 840])
         root.addWidget(splitter, 1)
+
+        # 页内快捷键:Ctrl+Enter 推导,Esc 取消
+        for seq in ("Ctrl+Return", "Ctrl+Enter"):
+            sc = QShortcut(QKeySequence(seq), self)
+            sc.setContext(Qt.WidgetWithChildrenShortcut)
+            sc.activated.connect(self._on_derive_shortcut)
+        esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
+        esc.setContext(Qt.WidgetWithChildrenShortcut)
+        esc.activated.connect(self._on_cancel)
+        self.derive_btn.setToolTip("Ctrl+Enter")
+        self.cancel_btn.setToolTip("Esc")
+
+    def focus_search(self):
+        """Ctrl+F:聚焦目标搜索框。"""
+        self.target_search.setFocus()
+        self.target_search.selectAll()
+
+    def _on_derive_shortcut(self):
+        if self.derive_btn.isEnabled():
+            self._on_derive()
 
     # ── data ready ──────────────────────────────────────────────
 
@@ -558,6 +580,7 @@ class ReverseTab(QWidget):
                 g = list(probs.keys())[0]
                 prob_str = f"{probs[g]*100:.1f}%"
             prob_item = NumericItem(prob_str, score)
+            prob_item.setToolTip(prob_str)
             prob_item.setFont(data_font)
             prob_item.setTextAlignment(Qt.AlignCenter)
             self.result_table.setItem(row, 2, prob_item)

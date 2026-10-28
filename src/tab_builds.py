@@ -56,6 +56,11 @@ class BuildsTab(QWidget):
 
         self._build_ui()
 
+    def focus_search(self):
+        """Ctrl+F:聚焦背景搜索框。"""
+        self.bg_search.setFocus()
+        self.bg_search.selectAll()
+
     # ── UI construction ──────────────────────────────────────────
 
     def _build_ui(self):

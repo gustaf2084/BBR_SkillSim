@@ -557,6 +557,11 @@ class ForwardTab(QWidget):
 
     # ---- external entry ----
 
+    def focus_search(self):
+        """Ctrl+F:聚焦特质搜索框。"""
+        self.trait_search.setFocus()
+        self.trait_search.selectAll()
+
     def load_config(self, bg_id, trait_ids):
         """填入指定背景与特质并立即计算(供逆向页"在正向模拟中打开"调用)。
 
@@ -682,12 +687,11 @@ class ForwardTab(QWidget):
             # category tag
             cat = self.gd.group_category(group) or ""
             cz = cat_name(cat) if cat else cat
-            bgc = theme.CAT_COLOR.get(cat, theme.CAT_COLOR["Always"])
             cat_rank = theme.CAT_ORDER.index(cat) if cat in theme.CAT_ORDER else len(theme.CAT_ORDER)
             ci = NumericItem(" " + cz + " ", cat_rank)
             ci.setTextAlignment(Qt.AlignCenter)
-            ci.setBackground(QBrush(QColor(bgc)))
-            ci.setForeground(QBrush(QColor(theme.c("badge_text"))))
+            # QSS 的 QTableWidget::item 规则会覆盖单元格底色,改用类别文字色
+            ci.setForeground(QBrush(QColor(theme.cat_text_color(cat))))
             ci.setFont(QFont("Microsoft YaHei", 10, QFont.Bold))
             self.result_table.setItem(row, 2, ci)
             # prob

@@ -280,7 +280,8 @@ class FlowLayout(QLayout):
         x, y = rect.x(), rect.y()
         line_h = 0
         for item in self._items:
-            if item.widget() is not None and not item.widget().isVisible():
+            # 用 isHidden 而非 isVisible:新加入、尚未 show 的子控件也要参与布局
+            if item.widget() is not None and item.widget().isHidden():
                 continue
             hint = item.sizeHint()
             next_x = x + hint.width() + self._spacing
@@ -330,6 +331,7 @@ class ChipBar(QWidget):
     def set_items(self, items):
         for btn in self._chips:
             self._layout.removeWidget(btn)
+            btn.hide()  # deleteLater 生效前仍会绘制,先隐藏避免残影
             btn.deleteLater()
         self._chips = []
         for key, text in items:

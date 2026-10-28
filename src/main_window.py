@@ -389,3 +389,10 @@ class MainWindow(QMainWindow):
             sc = QShortcut(QKeySequence("Ctrl+" + str(i)), self)
             # 走 nav 切页,左侧导航高亮随之同步
             sc.activated.connect(lambda idx=i-1: self.nav.setCurrentRow(idx))
+        find = QShortcut(QKeySequence.Find, self)
+        find.activated.connect(self._focus_current_search)
+
+    def _focus_current_search(self):
+        page = self.stack.currentWidget()
+        if hasattr(page, "focus_search"):
+            page.focus_search()

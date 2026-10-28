@@ -86,8 +86,6 @@ LIGHT = {
     # 概率条轨道
     "bar_track":      "#F0EDE6",
     "bar_border":     "#DDD6CC",
-    # 实色底上的文字(类别徽章等,两套主题均为白字)
-    "badge_text":     "#FFFFFF",
     # 技能节点缩写文字(按填充色亮度二选一)与悬停描边
     "node_text_light": "#FFFFFF",
     "node_text_dark":  "#1C1814",
@@ -153,7 +151,6 @@ DARK = {
     "scroll_handle_hover": "#6B5C3D",
     "bar_track":      "#2C2517",
     "bar_border":     "#3D3528",
-    "badge_text":     "#FFFFFF",
     "node_text_light": "#FFFFFF",
     "node_text_dark":  "#1C1814",
     "node_hover_ring": "#FFFFFF",
